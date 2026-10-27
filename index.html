@@ -1,0 +1,54 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+  <title>Hello World Game</title>
+  <style>
+    body {
+      background: #151c2c;
+      color: white;
+      font-family: sans-serif;
+      text-align: center;
+    }
+    canvas {
+      background: #263650;
+      width: 95%;
+      max-width: 500px;
+      touch-action: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Hello World!</h1>
+  <p>Drag the blue square around.</p>
+  <canvas id="game" width="500" height="300"></canvas>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const player = { x: 220, y: 130, size: 30 };
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#38bdf8";
+      ctx.fillRect(player.x, player.y,
+                   player.size, player.size);
+    }
+
+    canvas.addEventListener("pointermove", e => {
+      if (e.buttons === 0) return;
+      const rect = canvas.getBoundingClientRect();
+      player.x = (e.clientX - rect.left) *
+                 canvas.width / rect.width - 15;
+      player.y = (e.clientY - rect.top) *
+                 canvas.height / rect.height - 15;
+      draw();
+    });
+
+    draw();
+  </script>
+</body>
+</html>
