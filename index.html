@@ -3,28 +3,44 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1,
+               maximum-scale=1, user-scalable=no,
+               viewport-fit=cover">
 <title>Wolfenstein-Style 3D</title>
+
 <style>
-  * { box-sizing: border-box; }
+  * {
+    box-sizing: border-box;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
   html, body {
-    margin: 0;
+    position: fixed;
+    inset: 0;
     width: 100%;
     height: 100%;
+    margin: 0;
+    padding: 0;
     overflow: hidden;
     overscroll-behavior: none;
-    background: #080b12;
     touch-action: none;
+    background: #080b12;
     font-family: monospace;
   }
+
   #game {
     position: fixed;
     inset: 0;
+    display: block;
     width: 100%;
     height: 100%;
     image-rendering: pixelated;
     touch-action: none;
   }
+
   #hud {
     position: fixed;
     top: max(12px, env(safe-area-inset-top));
@@ -34,64 +50,65 @@
     text-shadow: 2px 2px #000;
     pointer-events: none;
   }
-  .controls {
+
+  #controls {
     position: fixed;
-    bottom: max(20px, env(safe-area-inset-bottom));
+    bottom: max(24px, env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
     display: grid;
+    grid-template-columns: repeat(3, 68px);
+    grid-template-rows: repeat(2, 68px);
     gap: 8px;
+    touch-action: none;
   }
-  #move {
-    left: 20px;
-    grid-template-columns: repeat(3, 62px);
-    grid-template-rows: repeat(2, 62px);
-  }
-  #turn {
-    right: 20px;
-    grid-template-columns: repeat(2, 62px);
-  }
+
   button {
     border: 2px solid #9ca3af;
     border-radius: 12px;
-    background: #1e293bcc;
+    background: rgba(30, 41, 59, 0.85);
     color: white;
-    font-size: 26px;
+    font-size: 28px;
     font-weight: bold;
     touch-action: none;
-    user-select: none;
-    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
-  button:active { background: #64748b; }
-  #forward { grid-column: 2; }
-  #back { grid-column: 2; grid-row: 2; }
-  #left { grid-column: 1; grid-row: 2; }
-  #right { grid-column: 3; grid-row: 2; }
+
+  button:active,
+  button.pressed {
+    background: #64748b;
+  }
+
+  #turnLeft  { grid-column: 1; grid-row: 1; }
+  #forward   { grid-column: 2; grid-row: 1; }
+  #turnRight { grid-column: 3; grid-row: 1; }
+  #left      { grid-column: 1; grid-row: 2; }
+  #back      { grid-column: 2; grid-row: 2; }
+  #right     { grid-column: 3; grid-row: 2; }
 </style>
 </head>
+
 <body>
 
 <canvas id="game"></canvas>
 <div id="hud">WOLF-STYLE 3D | FLOOR 1</div>
 
-<div id="move" class="controls">
+<div id="controls">
+  <button id="turnLeft">↶</button>
   <button id="forward">▲</button>
+  <button id="turnRight">↷</button>
   <button id="left">◀</button>
   <button id="back">▼</button>
   <button id="right">▶</button>
 </div>
 
-<div id="turn" class="controls">
-  <button id="turnLeft">↶</button>
-  <button id="turnRight">↷</button>
-</div>
-
 <script>
 const canvas = document.getElementById("game");
 const screen = canvas.getContext("2d");
-screen.imageSmoothingEnabled = false;
 
-// Low-resolution internal display for retro pixels.
 const W = 320;
 const H = 200;
+
 const buffer = document.createElement("canvas");
 buffer.width = W;
 buffer.height = H;
@@ -138,19 +155,18 @@ const radius = 0.2;
 
 function blocked(x, y) {
   return (
-    wall(Math.floor(x - radius), Math.floor(y - radius)) ||
-    wall(Math.floor(x + radius), Math.floor(y - radius)) ||
-    wall(Math.floor(x - radius), Math.floor(y + radius)) ||
-    wall(Math.floor(x + radius), Math.floor(y + radius))
+    wall(Math.floor(x-radius), Math.floor(y-radius)) ||
+    wall(Math.floor(x+radius), Math.floor(y-radius)) ||
+    wall(Math.floor(x-radius), Math.floor(y+radius)) ||
+    wall(Math.floor(x+radius), Math.floor(y+radius))
   );
 }
 
 function move(dx, dy) {
-  if (!blocked(player.x + dx, player.y)) player.x += dx;
-  if (!blocked(player.x, player.y + dy)) player.y += dy;
+  if (!blocked(player.x+dx, player.y)) player.x += dx;
+  if (!blocked(player.x, player.y+dy)) player.y += dy;
 }
 
-// Generate original procedural wall textures.
 function makeTexture(type) {
   const tex = document.createElement("canvas");
   tex.width = tex.height = 64;
@@ -164,38 +180,37 @@ function makeTexture(type) {
   t.fillStyle = mortar;
   t.fillRect(0, 0, 64, 64);
 
-  for (let row = 0; row < 4; row++) {
-    const offset = (row % 2) * 16;
-    for (let col = -1; col < 3; col++) {
-      const x = col * 32 + offset;
-      const y = row * 16;
-      t.fillStyle = base;
-      t.fillRect(x + 1, y + 1, 30, 14);
-
-      t.fillStyle = "rgba(255,255,255,.12)";
-      t.fillRect(x + 2, y + 2, 28, 2);
-
-      t.fillStyle = "rgba(0,0,0,.20)";
-      t.fillRect(x + 2, y + 12, 28, 2);
+  for (let row=0; row<4; row++) {
+    const offset = (row%2)*16;
+    for (let col=-1; col<3; col++) {
+      const x=col*32+offset;
+      const y=row*16;
+      t.fillStyle=base;
+      t.fillRect(x+1,y+1,30,14);
+      t.fillStyle="rgba(255,255,255,.12)";
+      t.fillRect(x+2,y+2,28,2);
+      t.fillStyle="rgba(0,0,0,.20)";
+      t.fillRect(x+2,y+12,28,2);
     }
   }
 
-  // Repeatable stone grain.
-  let seed = type * 12345;
+  let seed=type*12345;
   function random() {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    return seed / 4294967296;
+    seed=(seed*1664525+1013904223)>>>0;
+    return seed/4294967296;
   }
-  for (let i = 0; i < 900; i++) {
-    t.fillStyle = random() > 0.5
+
+  for (let i=0;i<900;i++) {
+    t.fillStyle=random()>0.5
       ? "rgba(255,255,255,.07)"
       : "rgba(0,0,0,.10)";
-    t.fillRect(random()*64, random()*64, 2, 2);
+    t.fillRect(random()*64,random()*64,2,2);
   }
-  return t.getImageData(0, 0, 64, 64).data;
+
+  return t.getImageData(0,0,64,64).data;
 }
 
-const textures = [
+const textures=[
   null,
   makeTexture(1),
   makeTexture(2),
@@ -203,214 +218,252 @@ const textures = [
 ];
 
 function render() {
-  // Ceiling and floor.
-  ctx.fillStyle = "#444952";
-  ctx.fillRect(0, 0, W, H/2);
-  ctx.fillStyle = "#343b48";
-  ctx.fillRect(0, H/2, W, H/2);
+  ctx.fillStyle="#444952";
+  ctx.fillRect(0,0,W,H/2);
+  ctx.fillStyle="#343b48";
+  ctx.fillRect(0,H/2,W,H/2);
 
-  const image = ctx.getImageData(0, 0, W, H);
-  const pixels = image.data;
+  const image=ctx.getImageData(0,0,W,H);
+  const pixels=image.data;
 
-  const dirX = Math.cos(player.angle);
-  const dirY = Math.sin(player.angle);
-  const planeX = -dirY * 0.66;
-  const planeY = dirX * 0.66;
+  const dirX=Math.cos(player.angle);
+  const dirY=Math.sin(player.angle);
+  const planeX=-dirY*0.66;
+  const planeY=dirX*0.66;
 
-  for (let x = 0; x < W; x++) {
-    const cameraX = 2 * x / W - 1;
-    const rayX = dirX + planeX * cameraX;
-    const rayY = dirY + planeY * cameraX;
+  for (let x=0;x<W;x++) {
+    const cameraX=2*x/W-1;
+    const rayX=dirX+planeX*cameraX;
+    const rayY=dirY+planeY*cameraX;
 
-    let mapX = Math.floor(player.x);
-    let mapY = Math.floor(player.y);
+    let mapX=Math.floor(player.x);
+    let mapY=Math.floor(player.y);
 
-    const deltaX = rayX === 0 ? 1e30 : Math.abs(1/rayX);
-    const deltaY = rayY === 0 ? 1e30 : Math.abs(1/rayY);
+    const deltaX=rayX===0?1e30:Math.abs(1/rayX);
+    const deltaY=rayY===0?1e30:Math.abs(1/rayY);
 
-    const stepX = rayX < 0 ? -1 : 1;
-    const stepY = rayY < 0 ? -1 : 1;
+    const stepX=rayX<0?-1:1;
+    const stepY=rayY<0?-1:1;
 
-    let sideX = (rayX < 0
-      ? player.x - mapX : mapX + 1 - player.x) * deltaX;
-    let sideY = (rayY < 0
-      ? player.y - mapY : mapY + 1 - player.y) * deltaY;
+    let sideX=(rayX<0
+      ?player.x-mapX:mapX+1-player.x)*deltaX;
+    let sideY=(rayY<0
+      ?player.y-mapY:mapY+1-player.y)*deltaY;
 
-    let side = 0;
-    let hit = 0;
+    let side=0,hit=0;
 
-    for (let i = 0; i < 40; i++) {
-      if (sideX < sideY) {
-        sideX += deltaX;
-        mapX += stepX;
-        side = 0;
+    for (let i=0;i<40;i++) {
+      if (sideX<sideY) {
+        sideX+=deltaX;
+        mapX+=stepX;
+        side=0;
       } else {
-        sideY += deltaY;
-        mapY += stepY;
-        side = 1;
+        sideY+=deltaY;
+        mapY+=stepY;
+        side=1;
       }
-      hit = wall(mapX, mapY);
+      hit=wall(mapX,mapY);
       if (hit) break;
     }
 
     if (!hit) continue;
 
-    const distance = Math.max(0.01,
-      side === 0 ? sideX - deltaX : sideY - deltaY);
+    const distance=Math.max(0.01,
+      side===0?sideX-deltaX:sideY-deltaY);
 
-    const lineHeight = Math.floor(H / distance);
-    const start = Math.max(0, Math.floor((H-lineHeight)/2));
-    const end = Math.min(H, Math.floor((H+lineHeight)/2));
+    const lineHeight=Math.floor(H/distance);
+    const start=Math.max(0,Math.floor((H-lineHeight)/2));
+    const end=Math.min(H,Math.floor((H+lineHeight)/2));
 
-    let wallX = side === 0
-      ? player.y + distance * rayY
-      : player.x + distance * rayX;
-    wallX -= Math.floor(wallX);
+    let wallX=side===0
+      ?player.y+distance*rayY
+      :player.x+distance*rayX;
+    wallX-=Math.floor(wallX);
 
-    let texX = Math.floor(wallX * 64);
-    if ((side === 0 && rayX > 0) ||
-        (side === 1 && rayY < 0)) texX = 63 - texX;
+    let texX=Math.floor(wallX*64);
+    if ((side===0&&rayX>0)||
+        (side===1&&rayY<0)) texX=63-texX;
 
-    const texture = textures[hit] || textures[1];
-    const shade = Math.max(0.25,
-      Math.min(1, 1.15 - distance * 0.075)) *
-      (side === 1 ? 0.75 : 1);
+    const texture=textures[hit]||textures[1];
+    const shade=Math.max(0.25,
+      Math.min(1,1.15-distance*0.075))*
+      (side===1?0.75:1);
 
-    for (let y = start; y < end; y++) {
-      const texY = Math.floor(
-        ((y - H/2 + lineHeight/2) / lineHeight) * 64
-      ) & 63;
+    for (let y=start;y<end;y++) {
+      const texY=Math.floor(
+        ((y-H/2+lineHeight/2)/lineHeight)*64
+      )&63;
 
-      const src = (texY * 64 + texX) * 4;
-      const dst = (y * W + x) * 4;
+      const src=(texY*64+texX)*4;
+      const dst=(y*W+x)*4;
 
-      pixels[dst] = texture[src] * shade;
-      pixels[dst+1] = texture[src+1] * shade;
-      pixels[dst+2] = texture[src+2] * shade;
-      pixels[dst+3] = 255;
+      pixels[dst]=texture[src]*shade;
+      pixels[dst+1]=texture[src+1]*shade;
+      pixels[dst+2]=texture[src+2]*shade;
+      pixels[dst+3]=255;
     }
   }
 
-  ctx.putImageData(image, 0, 0);
+  ctx.putImageData(image,0,0);
 
-  // Simple weapon silhouette.
-  ctx.fillStyle = "#18191d";
-  ctx.fillRect(148, 169, 24, 31);
-  ctx.fillStyle = "#555961";
-  ctx.fillRect(153, 151, 14, 34);
-  ctx.fillStyle = "#92969c";
-  ctx.fillRect(157, 146, 6, 30);
-  ctx.fillStyle = "#302923";
-  ctx.fillRect(150, 185, 20, 15);
+  // Weapon silhouette
+  ctx.fillStyle="#18191d";
+  ctx.fillRect(148,169,24,31);
+  ctx.fillStyle="#555961";
+  ctx.fillRect(153,151,14,34);
+  ctx.fillStyle="#92969c";
+  ctx.fillRect(157,146,6,30);
+  ctx.fillStyle="#302923";
+  ctx.fillRect(150,185,20,15);
 
-  // Minimap.
-  const scale = 5;
-  const ox = 5, oy = 5;
-  ctx.fillStyle = "rgba(0,0,0,.65)";
-  ctx.fillRect(ox-2, oy-2, MW*scale+4, MH*scale+4);
+  // Minimap
+  const scale=5,ox=5,oy=5;
+  ctx.fillStyle="rgba(0,0,0,.65)";
+  ctx.fillRect(ox-2,oy-2,MW*scale+4,MH*scale+4);
 
-  for (let y = 0; y < MH; y++) {
-    for (let x = 0; x < MW; x++) {
-      ctx.fillStyle = wall(x,y) ? "#a5a9b1" : "#26354b";
-      ctx.fillRect(ox+x*scale, oy+y*scale,
-                   scale-1, scale-1);
+  for (let y=0;y<MH;y++) {
+    for (let x=0;x<MW;x++) {
+      ctx.fillStyle=wall(x,y)?"#a5a9b1":"#26354b";
+      ctx.fillRect(ox+x*scale,oy+y*scale,scale-1,scale-1);
     }
   }
 
-  ctx.fillStyle = "#ffdc55";
+  ctx.fillStyle="#ffdc55";
   ctx.fillRect(ox+player.x*scale-2,
-               oy+player.y*scale-2, 4, 4);
-  ctx.strokeStyle = "#ffdc55";
+               oy+player.y*scale-2,4,4);
+  ctx.strokeStyle="#ffdc55";
   ctx.beginPath();
-  ctx.moveTo(ox+player.x*scale, oy+player.y*scale);
+  ctx.moveTo(ox+player.x*scale,oy+player.y*scale);
   ctx.lineTo(
     ox+(player.x+Math.cos(player.angle)*2)*scale,
     oy+(player.y+Math.sin(player.angle)*2)*scale
   );
   ctx.stroke();
 
-  // Scale to fill the screen.
-  screen.imageSmoothingEnabled = false;
-  screen.clearRect(0, 0, canvas.width, canvas.height);
-  screen.drawImage(buffer, 0, 0,
-                   canvas.width, canvas.height);
+  screen.imageSmoothingEnabled=false;
+  screen.clearRect(0,0,canvas.width,canvas.height);
+  screen.drawImage(buffer,0,0,canvas.width,canvas.height);
 }
 
 function resize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = Math.round(innerWidth * dpr);
-  canvas.height = Math.round(innerHeight * dpr);
-  screen.imageSmoothingEnabled = false;
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  canvas.width=Math.round(innerWidth*dpr);
+  canvas.height=Math.round(innerHeight*dpr);
+  screen.imageSmoothingEnabled=false;
 }
-window.addEventListener("resize", resize);
+window.addEventListener("resize",resize);
 resize();
 
-// Touch controls.
-const bindings = {
-  forward: "forward",
-  back: "back",
-  left: "left",
-  right: "right",
-  turnLeft: "turnLeft",
-  turnRight: "turnRight"
+// Controls: track each pointer separately.
+const activePointers=new Map();
+
+const bindings={
+  forward:"forward",
+  back:"back",
+  left:"left",
+  right:"right",
+  turnLeft:"turnLeft",
+  turnRight:"turnRight"
 };
 
-for (const [id, action] of Object.entries(bindings)) {
-  const button = document.getElementById(id);
-  button.addEventListener("pointerdown", e => {
-    e.preventDefault();
-    button.setPointerCapture(e.pointerId);
-    keys.add(action);
-  });
-  const release = () => keys.delete(action);
-  button.addEventListener("pointerup", release);
-  button.addEventListener("pointercancel", release);
-  button.addEventListener("lostpointercapture", release);
+function syncControls() {
+  for (const action of Object.values(bindings)) {
+    let held=false;
+    for (const value of activePointers.values()) {
+      if (value===action) held=true;
+    }
+    if (held) keys.add(action);
+    else keys.delete(action);
+  }
 }
 
-// Keyboard controls for desktop.
-const keyboard = {
-  KeyW: "forward", ArrowUp: "forward",
-  KeyS: "back", ArrowDown: "back",
-  KeyA: "left", KeyD: "right",
-  ArrowLeft: "turnLeft",
-  ArrowRight: "turnRight",
-  KeyQ: "turnLeft", KeyE: "turnRight"
+for (const [id,action] of Object.entries(bindings)) {
+  const button=document.getElementById(id);
+
+  button.addEventListener("pointerdown",e=>{
+    e.preventDefault();
+    button.setPointerCapture(e.pointerId);
+    activePointers.set(e.pointerId,action);
+    button.classList.add("pressed");
+    syncControls();
+  });
+
+  function release(e) {
+    activePointers.delete(e.pointerId);
+    button.classList.remove("pressed");
+    syncControls();
+  }
+
+  button.addEventListener("pointerup",release);
+  button.addEventListener("pointercancel",release);
+  button.addEventListener("lostpointercapture",release);
+}
+
+// Prevent Safari scrolling and gesture handling.
+document.addEventListener("touchmove",e=>{
+  e.preventDefault();
+},{passive:false});
+
+document.addEventListener("gesturestart",e=>{
+  e.preventDefault();
+},{passive:false});
+
+document.addEventListener("gesturechange",e=>{
+  e.preventDefault();
+},{passive:false});
+
+// Keyboard controls
+const keyboard={
+  KeyW:"forward",ArrowUp:"forward",
+  KeyS:"back",ArrowDown:"back",
+  KeyA:"left",KeyD:"right",
+  ArrowLeft:"turnLeft",
+  ArrowRight:"turnRight",
+  KeyQ:"turnLeft",KeyE:"turnRight"
 };
-window.addEventListener("keydown", e => {
+
+window.addEventListener("keydown",e=>{
   if (keyboard[e.code]) {
     e.preventDefault();
     keys.add(keyboard[e.code]);
   }
 });
-window.addEventListener("keyup", e => {
+
+window.addEventListener("keyup",e=>{
   if (keyboard[e.code]) keys.delete(keyboard[e.code]);
 });
-window.addEventListener("blur", () => keys.clear());
 
-let previous = performance.now();
+window.addEventListener("blur",()=>{
+  keys.clear();
+  activePointers.clear();
+  document.querySelectorAll("button").forEach(
+    b=>b.classList.remove("pressed")
+  );
+});
+
+let previous=performance.now();
 
 function loop(now) {
-  const dt = Math.min((now - previous)/1000, 0.05);
-  previous = now;
+  const dt=Math.min((now-previous)/1000,0.05);
+  previous=now;
 
-  if (keys.has("turnLeft")) player.angle -= turnSpeed*dt;
-  if (keys.has("turnRight")) player.angle += turnSpeed*dt;
+  if (keys.has("turnLeft")) player.angle-=turnSpeed*dt;
+  if (keys.has("turnRight")) player.angle+=turnSpeed*dt;
 
-  const dx = Math.cos(player.angle);
-  const dy = Math.sin(player.angle);
-  const sx = -dy;
-  const sy = dx;
+  const dx=Math.cos(player.angle);
+  const dy=Math.sin(player.angle);
+  const sx=-dy;
+  const sy=dx;
 
-  let mx = 0, my = 0;
+  let mx=0,my=0;
 
-  if (keys.has("forward")) { mx += dx; my += dy; }
-  if (keys.has("back")) { mx -= dx; my -= dy; }
-  if (keys.has("left")) { mx -= sx; my -= sy; }
-  if (keys.has("right")) { mx += sx; my += sy; }
+  if (keys.has("forward")) {mx+=dx;my+=dy;}
+  if (keys.has("back")) {mx-=dx;my-=dy;}
+  if (keys.has("left")) {mx-=sx;my-=sy;}
+  if (keys.has("right")) {mx+=sx;my+=sy;}
 
-  const length = Math.hypot(mx, my);
-  if (length > 0) {
+  const length=Math.hypot(mx,my);
+  if (length>0) {
     move(mx/length*moveSpeed*dt,
          my/length*moveSpeed*dt);
   }
