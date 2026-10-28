@@ -1,478 +1,120 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport"
-      content="width=device-width, initial-scale=1,
-               maximum-scale=1, user-scalable=no,
-               viewport-fit=cover">
-<title>Wolfenstein-Style 3D</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wolf-Style Survival</title>
 <style>
-  * {
-    box-sizing: border-box;
-    -webkit-user-select: none;
-    user-select: none;
-    -webkit-touch-callout: none;
-  }
-
-  html, body {
-    position: fixed;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    overscroll-behavior: none;
-    touch-action: none;
-    background: #080b12;
-    font-family: monospace;
-  }
-
-  #game {
-    position: fixed;
-    inset: 0;
-    display: block;
-    width: 100%;
-    height: 100%;
-    image-rendering: pixelated;
-    touch-action: none;
-  }
-
-  #hud {
-    position: fixed;
-    top: max(12px, env(safe-area-inset-top));
-    left: 12px;
-    color: #f3d28a;
-    font-size: 14px;
-    text-shadow: 2px 2px #000;
-    pointer-events: none;
-  }
-
-  #controls {
-    position: fixed;
-    bottom: max(24px, env(safe-area-inset-bottom));
-    left: 50%;
-    transform: translateX(-50%);
-    display: grid;
-    grid-template-columns: repeat(3, 68px);
-    grid-template-rows: repeat(2, 68px);
-    gap: 8px;
-    touch-action: none;
-  }
-
-  button {
-    border: 2px solid #9ca3af;
-    border-radius: 12px;
-    background: rgba(30, 41, 59, 0.85);
-    color: white;
-    font-size: 28px;
-    font-weight: bold;
-    touch-action: none;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  button:active,
-  button.pressed {
-    background: #64748b;
-  }
-
-  #turnLeft  { grid-column: 1; grid-row: 1; }
-  #forward   { grid-column: 2; grid-row: 1; }
-  #turnRight { grid-column: 3; grid-row: 1; }
-  #left      { grid-column: 1; grid-row: 2; }
-  #back      { grid-column: 2; grid-row: 2; }
-  #right     { grid-column: 3; grid-row: 2; }
+*{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+html,body{position:fixed;inset:0;width:100%;height:100%;margin:0;overflow:hidden;overscroll-behavior:none;touch-action:none;background:#080b12;font-family:monospace}
+#game{position:fixed;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated;touch-action:none}
+#hud{position:fixed;top:max(12px,env(safe-area-inset-top));left:12px;color:#f3d28a;font-size:clamp(13px,2vw,19px);font-weight:bold;text-shadow:2px 2px #000;pointer-events:none;line-height:1.5}
+#controls{position:fixed;bottom:max(20px,env(safe-area-inset-bottom));left:clamp(12px,5vw,70px);display:grid;grid-template-columns:repeat(3,clamp(50px,9vw,72px));grid-template-rows:repeat(2,clamp(50px,9vw,72px));gap:7px;touch-action:none}
+button{border:2px solid #a3a3a3;border-radius:12px;background:#1e293bdc;color:white;font-size:clamp(23px,4vw,30px);font-weight:bold;touch-action:none;-webkit-tap-highlight-color:transparent}
+button.pressed{background:#64748b}
+#turnLeft{grid-column:1;grid-row:1}#forward{grid-column:2;grid-row:1}#turnRight{grid-column:3;grid-row:1}
+#left{grid-column:1;grid-row:2}#back{grid-column:2;grid-row:2}#right{grid-column:3;grid-row:2}
+#fire{position:fixed;right:clamp(18px,8vw,110px);bottom:max(42px,env(safe-area-inset-bottom));width:clamp(82px,16vw,130px);height:clamp(82px,16vw,130px);border-radius:50%;background:#8e2929dd;border:3px solid #f1b0a4;font-size:clamp(18px,3vw,26px)}
+#fire.pressed{background:#e04a35}
+#gameover{position:fixed;inset:0;background:#080912e8;display:none;align-items:center;justify-content:center;flex-direction:column;color:white;text-align:center;z-index:5;gap:14px}
+#gameover h1{font-size:clamp(38px,8vw,72px);color:#ed4545;margin:0;text-shadow:3px 3px black}
+#gameover p{font-size:24px;margin:0}
+#restart{font-size:22px;padding:14px 28px;background:#315d41;border-color:#7dc79b}
 </style>
 </head>
-
 <body>
-
 <canvas id="game"></canvas>
-<div id="hud">WOLF-STYLE 3D | FLOOR 1</div>
-
+<div id="hud"><div id="stats">HEALTH 100 | KILLS 0</div><div id="wave">ENEMY INCOMING</div></div>
 <div id="controls">
-  <button id="turnLeft">↶</button>
-  <button id="forward">▲</button>
-  <button id="turnRight">↷</button>
-  <button id="left">◀</button>
-  <button id="back">▼</button>
-  <button id="right">▶</button>
+<button id="turnLeft">↶</button><button id="forward">▲</button><button id="turnRight">↷</button>
+<button id="left">◀</button><button id="back">▼</button><button id="right">▶</button>
 </div>
-
+<button id="fire">FIRE</button>
+<div id="gameover"><h1>GAME OVER</h1><p id="finalScore"></p><button id="restart">RESTART</button></div>
 <script>
-const canvas = document.getElementById("game");
-const screen = canvas.getContext("2d");
-
-const W = 320;
-const H = 200;
-
-const buffer = document.createElement("canvas");
-buffer.width = W;
-buffer.height = H;
-const ctx = buffer.getContext("2d");
-
-// 1 = stone, 2 = blue wall, 3 = brown wall
-const map = [
-  "1111111111111111",
-  "1000000000000001",
-  "1011100111000001",
-  "1000100001000001",
-  "1000100001002201",
-  "1000000000002001",
-  "1000000000002001",
-  "1000111000000001",
-  "1000100000111001",
-  "1000100000100001",
-  "1000000000100001",
-  "1000000000000001",
-  "1000330000000001",
-  "1000030000000001",
-  "1000000000000001",
-  "1111111111111111"
-];
-
-const MW = map[0].length;
-const MH = map.length;
-
-function wall(x, y) {
-  if (x < 0 || y < 0 || x >= MW || y >= MH) return 1;
-  return Number(map[y][x]);
+'use strict';
+const canvas=document.getElementById('game'),screen=canvas.getContext('2d',{alpha:false});
+const W=320,H=200,buffer=document.createElement('canvas');buffer.width=W;buffer.height=H;
+const ctx=buffer.getContext('2d',{willReadFrequently:true});
+const map=[
+'1111111111111111','1000000000000001','1011100111000001','1000100001000001',
+'1000100001002201','1000000000002001','1000000000002001','1000111000000001',
+'1000100000111001','1000100000100001','1000000000100001','1000000000000001',
+'1000330000000001','1000030000000001','1000000000000001','1111111111111111'];
+const MW=map[0].length,MH=map.length;
+function wall(x,y){if(x<0||y<0||x>=MW||y>=MH)return 1;return Number(map[y][x]);}
+function solid(x,y,r=.2){return !!(wall(Math.floor(x-r),Math.floor(y-r))||wall(Math.floor(x+r),Math.floor(y-r))||wall(Math.floor(x-r),Math.floor(y+r))||wall(Math.floor(x+r),Math.floor(y+r)));}
+function makeTexture(type){const c=document.createElement('canvas');c.width=c.height=64;const t=c.getContext('2d');const base=['','#777b80','#405d88','#80614c'][type],mortar=['','#33383e','#202e49','#453529'][type];t.fillStyle=mortar;t.fillRect(0,0,64,64);
+for(let row=0;row<4;row++){const offset=row%2*16;for(let col=-1;col<3;col++){const x=col*32+offset,y=row*16;t.fillStyle=base;t.fillRect(x+1,y+1,30,14);t.fillStyle='#ffffff20';t.fillRect(x+2,y+2,28,2);t.fillStyle='#00000033';t.fillRect(x+2,y+12,28,2);}}
+let seed=type*12345;const rand=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);for(let i=0;i<900;i++){t.fillStyle=rand()>.5?'#ffffff12':'#0000001a';t.fillRect(rand()*64,rand()*64,2,2);}return t.getImageData(0,0,64,64).data;}
+const textures=[null,makeTexture(1),makeTexture(2),makeTexture(3)];
+// Original pixel-art guard, drawn once and used as a sprite.
+function makeGuard(){const c=document.createElement('canvas');c.width=32;c.height=64;const g=c.getContext('2d');g.imageSmoothingEnabled=false;
+function rect(color,x,y,w,h){g.fillStyle=color;g.fillRect(x,y,w,h);}
+rect('#151a1c',7,51,8,13);rect('#151a1c',18,51,8,13);rect('#292e35',7,50,8,9);rect('#292e35',18,50,8,9);
+rect('#1b2924',5,23,23,30);rect('#3e5644',7,25,19,24);rect('#26372d',5,27,5,21);rect('#26372d',24,27,5,21);
+rect('#ae8972',10,13,13,14);rect('#654b3c',10,13,13,3);rect('#232b2b',9,8,15,8);rect('#46544b',7,7,19,7);rect('#232b2b',7,13,19,3);
+rect('#1b2021',12,19,3,2);rect('#1b2021',20,19,3,2);rect('#594437',15,24,5,2);
+rect('#12191b',11,36,12,5);rect('#666b6a',13,32,8,10);rect('#1d2526',14,39,6,12);
+rect('#b6a36c',12,29,3,3);rect('#293d32',8,46,18,4);
+return g.getImageData(0,0,32,64).data;}
+const guardPixels=makeGuard(),zBuffer=new Float32Array(W);
+const player={x:3.5,y:5.5,angle:0,health:100};
+let enemy=null,kills=0,spawnAt=0,gameOver=false,flashUntil=0,damageFlashUntil=0,lastShot=0,lastEnemyAttack=0;
+const keys=new Set(),activePointers=new Map(),keyboardHeld=new Set();
+const bindings={forward:'forward',back:'back',left:'left',right:'right',turnLeft:'turnLeft',turnRight:'turnRight',fire:'fire'};
+function syncKeys(){keys.clear();for(const action of activePointers.values())keys.add(action);for(const action of keyboardHeld)keys.add(action);}
+for(const [id,action] of Object.entries(bindings)){const b=document.getElementById(id);b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);activePointers.set(e.pointerId,action);b.classList.add('pressed');syncKeys();});function release(e){activePointers.delete(e.pointerId);b.classList.remove('pressed');syncKeys();}b.addEventListener('pointerup',release);b.addEventListener('pointercancel',release);b.addEventListener('lostpointercapture',release);}
+const keyMap={KeyW:'forward',ArrowUp:'forward',KeyS:'back',ArrowDown:'back',KeyA:'left',KeyD:'right',ArrowLeft:'turnLeft',ArrowRight:'turnRight',KeyQ:'turnLeft',KeyE:'turnRight',Space:'fire'};
+window.addEventListener('keydown',e=>{const action=keyMap[e.code];if(action){e.preventDefault();keyboardHeld.add(action);syncKeys();}});
+window.addEventListener('keyup',e=>{const action=keyMap[e.code];if(action){keyboardHeld.delete(action);syncKeys();}});
+window.addEventListener('blur',()=>{activePointers.clear();keyboardHeld.clear();syncKeys();document.querySelectorAll('button').forEach(b=>b.classList.remove('pressed'));});
+document.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
+document.addEventListener('gesturestart',e=>e.preventDefault(),{passive:false});
+document.addEventListener('gesturechange',e=>e.preventDefault(),{passive:false});
+function resize(){const dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(innerWidth*dpr);canvas.height=Math.round(innerHeight*dpr);screen.imageSmoothingEnabled=false;}window.addEventListener('resize',resize);resize();
+// Ray distance to first wall along a unit direction.
+function rayDistance(px,py,dx,dy,maxDistance=30){let mx=Math.floor(px),my=Math.floor(py);const deltaX=dx===0?1e30:Math.abs(1/dx),deltaY=dy===0?1e30:Math.abs(1/dy),stepX=dx<0?-1:1,stepY=dy<0?-1:1;let sx=(dx<0?px-mx:mx+1-px)*deltaX,sy=(dy<0?py-my:my+1-py)*deltaY,side=0;
+for(let i=0;i<64;i++){if(sx<sy){sx+=deltaX;mx+=stepX;side=0;}else{sy+=deltaY;my+=stepY;side=1;}const dist=side===0?sx-deltaX:sy-deltaY;if(dist>maxDistance)return {distance:maxDistance,hit:0};const hit=wall(mx,my);if(hit)return {distance:Math.max(.001,dist),hit,side,wallX:((side===0?py+dist*dy:px+dist*dx)%1+1)%1,dx,dy};}
+return {distance:maxDistance,hit:0};}
+function visible(ax,ay,bx,by){const dx=bx-ax,dy=by-ay,d=Math.hypot(dx,dy);return rayDistance(ax,ay,dx/d,dy/d,d).distance>=d-.15;}
+const corners=[[1.5,1.5],[14.5,1.5],[1.5,14.5],[14.5,14.5]];
+function spawnEnemy(){const choices=corners.filter(([x,y])=>!solid(x,y,.22)&&Math.hypot(x-player.x,y-player.y)>3);const pool=choices.length?choices:corners.filter(([x,y])=>!solid(x,y,.22));if(!pool.length)return;const [x,y]=pool[Math.floor(Math.random()*pool.length)];enemy={x,y,health:2};spawnAt=0;}
+function reset(){player.x=3.5;player.y=5.5;player.angle=0;player.health=100;kills=0;enemy=null;gameOver=false;spawnAt=0;flashUntil=0;damageFlashUntil=0;lastShot=0;lastEnemyAttack=0;activePointers.clear();keyboardHeld.clear();syncKeys();document.getElementById('gameover').style.display='none';spawnEnemy();}
+document.getElementById('restart').addEventListener('click',reset);
+function die(){gameOver=true;player.health=0;document.getElementById('finalScore').textContent='Enemies killed: '+kills;document.getElementById('gameover').style.display='flex';}
+function shoot(now){if(gameOver||now-lastShot<300)return;lastShot=now;flashUntil=now+110;if(!enemy)return;const dx=enemy.x-player.x,dy=enemy.y-player.y,dist=Math.hypot(dx,dy),angle=Math.atan2(dy,dx)-player.angle,aim=Math.atan2(Math.sin(angle),Math.cos(angle));if(Math.abs(aim)<Math.atan2(.32,dist)&&visible(player.x,player.y,enemy.x,enemy.y)){enemy.health--;if(enemy.health<=0){enemy=null;kills++;spawnAt=now+5000;}}}
+function update(dt,now){if(gameOver)return;
+if(keys.has('turnLeft'))player.angle-=2.3*dt;if(keys.has('turnRight'))player.angle+=2.3*dt;
+const dx=Math.cos(player.angle),dy=Math.sin(player.angle),sx=-dy,sy=dx;let mx=0,my=0;
+if(keys.has('forward')){mx+=dx;my+=dy;}if(keys.has('back')){mx-=dx;my-=dy;}if(keys.has('left')){mx-=sx;my-=sy;}if(keys.has('right')){mx+=sx;my+=sy;}
+const len=Math.hypot(mx,my);if(len){const vx=mx/len*2.8*dt,vy=my/len*2.8*dt;if(!solid(player.x+vx,player.y))player.x+=vx;if(!solid(player.x,player.y+vy))player.y+=vy;}
+if(keys.has('fire'))shoot(now);
+if(!enemy&&spawnAt&&now>=spawnAt)spawnEnemy();
+if(enemy){const ex=player.x-enemy.x,ey=player.y-enemy.y,d=Math.hypot(ex,ey);if(d>0.8){const speed=1.05*dt;if(!solid(enemy.x+ex/d*speed,enemy.y,.23))enemy.x+=ex/d*speed;if(!solid(enemy.x,enemy.y+ey/d*speed,.23))enemy.y+=ey/d*speed;}
+if(d<1.25&&visible(enemy.x,enemy.y,player.x,player.y)&&now-lastEnemyAttack>900){lastEnemyAttack=now;player.health=Math.max(0,player.health-10);damageFlashUntil=now+180;if(player.health<=0)die();}}
 }
-
-const player = {
-  x: 3.5,
-  y: 5.5,
-  angle: 0
-};
-
-const keys = new Set();
-const moveSpeed = 2.8;
-const turnSpeed = 2.3;
-const radius = 0.2;
-
-function blocked(x, y) {
-  return (
-    wall(Math.floor(x-radius), Math.floor(y-radius)) ||
-    wall(Math.floor(x+radius), Math.floor(y-radius)) ||
-    wall(Math.floor(x-radius), Math.floor(y+radius)) ||
-    wall(Math.floor(x+radius), Math.floor(y+radius))
-  );
+function render(now){ctx.fillStyle='#444952';ctx.fillRect(0,0,W,H/2);ctx.fillStyle='#343b48';ctx.fillRect(0,H/2,W,H/2);const image=ctx.getImageData(0,0,W,H),pixels=image.data;
+const dirX=Math.cos(player.angle),dirY=Math.sin(player.angle),planeX=-dirY*.66,planeY=dirX*.66;
+for(let x=0;x<W;x++){const cameraX=2*x/W-1,rayX=dirX+planeX*cameraX,rayY=dirY+planeY*cameraX;const hit=rayDistance(player.x,player.y,rayX,rayY);if(!hit.hit){zBuffer[x]=30;continue;}const distance=hit.distance;zBuffer[x]=distance;const lineHeight=Math.floor(H/distance),start=Math.max(0,Math.floor((H-lineHeight)/2)),end=Math.min(H,Math.floor((H+lineHeight)/2));let texX=Math.floor(hit.wallX*64);if((hit.side===0&&rayX>0)||(hit.side===1&&rayY<0))texX=63-texX;const texture=textures[hit.hit]||textures[1],shade=Math.max(.25,Math.min(1,1.15-distance*.075))*(hit.side===1?.75:1);
+for(let y=start;y<end;y++){const texY=Math.floor(((y-H/2+lineHeight/2)/lineHeight)*64)&63,src=(texY*64+texX)*4,dst=(y*W+x)*4;pixels[dst]=texture[src]*shade;pixels[dst+1]=texture[src+1]*shade;pixels[dst+2]=texture[src+2]*shade;pixels[dst+3]=255;}}
+// Enemy billboard with wall-depth occlusion.
+if(enemy){const spriteX=enemy.x-player.x,spriteY=enemy.y-player.y,invDet=1/(planeX*dirY-dirX*planeY),transformX=invDet*(dirY*spriteX-dirX*spriteY),transformY=invDet*(-planeY*spriteX+planeX*spriteY);
+if(transformY>.1){const spriteScreenX=Math.floor(W/2*(1+transformX/transformY)),spriteHeight=Math.abs(Math.floor(H/transformY)),spriteWidth=Math.floor(spriteHeight*.5),startY=Math.floor(H/2-spriteHeight/2),startX=Math.floor(spriteScreenX-spriteWidth/2),endX=startX+spriteWidth;
+for(let stripe=Math.max(0,startX);stripe<Math.min(W,endX);stripe++){if(transformY>=zBuffer[stripe]||spriteWidth<=0)continue;const tx=Math.floor((stripe-startX)/spriteWidth*32);for(let y=Math.max(0,startY);y<Math.min(H,startY+spriteHeight);y++){const ty=Math.floor((y-startY)/spriteHeight*64);if(tx<0||tx>=32||ty<0||ty>=64)continue;const src=(ty*32+tx)*4;if(!guardPixels[src+3])continue;const dst=(y*W+stripe)*4,shade=Math.max(.4,1-transformY*.035);pixels[dst]=guardPixels[src]*shade;pixels[dst+1]=guardPixels[src+1]*shade;pixels[dst+2]=guardPixels[src+2]*shade;pixels[dst+3]=255;}}}}
+ctx.putImageData(image,0,0);
+// Weapon and muzzle flash.
+ctx.fillStyle='#18191d';ctx.fillRect(143,171,34,29);ctx.fillStyle='#555961';ctx.fillRect(151,151,18,37);ctx.fillStyle='#92969c';ctx.fillRect(156,143,8,34);ctx.fillStyle='#302923';ctx.fillRect(148,185,24,15);
+if(now<flashUntil){ctx.fillStyle='#fff1a1';ctx.fillRect(154,123,12,22);ctx.fillRect(146,130,28,8);ctx.fillStyle='#ffad22';ctx.fillRect(157,128,6,15);}
+ctx.strokeStyle='#e6dfbb';ctx.beginPath();ctx.moveTo(155,100);ctx.lineTo(159,100);ctx.moveTo(161,100);ctx.lineTo(165,100);ctx.moveTo(160,95);ctx.lineTo(160,98);ctx.moveTo(160,102);ctx.lineTo(160,105);ctx.stroke();
+// Minimap.
+const scale=5,ox=5,oy=5;ctx.fillStyle='#000a';ctx.fillRect(ox-2,oy-2,MW*scale+4,MH*scale+4);for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){ctx.fillStyle=wall(x,y)?'#a5a9b1':'#26354b';ctx.fillRect(ox+x*scale,oy+y*scale,scale-1,scale-1);}if(enemy){ctx.fillStyle='#f44';ctx.fillRect(ox+enemy.x*scale-2,oy+enemy.y*scale-2,4,4);}ctx.fillStyle='#ffdc55';ctx.fillRect(ox+player.x*scale-2,oy+player.y*scale-2,4,4);ctx.strokeStyle='#ffdc55';ctx.beginPath();ctx.moveTo(ox+player.x*scale,oy+player.y*scale);ctx.lineTo(ox+(player.x+Math.cos(player.angle)*2)*scale,oy+(player.y+Math.sin(player.angle)*2)*scale);ctx.stroke();
+if(now<damageFlashUntil){ctx.fillStyle='#ff00004d';ctx.fillRect(0,0,W,H);}
+screen.imageSmoothingEnabled=false;screen.drawImage(buffer,0,0,canvas.width,canvas.height);
+document.getElementById('stats').textContent='HEALTH '+player.health+' | KILLS '+kills;
+document.getElementById('wave').textContent=enemy?'ENEMY ACTIVE':spawnAt?'NEXT ENEMY IN '+Math.max(0,Math.ceil((spawnAt-now)/1000))+'s':'ENEMY INCOMING';
 }
-
-function move(dx, dy) {
-  if (!blocked(player.x+dx, player.y)) player.x += dx;
-  if (!blocked(player.x, player.y+dy)) player.y += dy;
-}
-
-function makeTexture(type) {
-  const tex = document.createElement("canvas");
-  tex.width = tex.height = 64;
-  const t = tex.getContext("2d");
-
-  const base = type === 1 ? "#777b80" :
-               type === 2 ? "#405d88" : "#80614c";
-  const mortar = type === 1 ? "#33383e" :
-                 type === 2 ? "#202e49" : "#453529";
-
-  t.fillStyle = mortar;
-  t.fillRect(0, 0, 64, 64);
-
-  for (let row=0; row<4; row++) {
-    const offset = (row%2)*16;
-    for (let col=-1; col<3; col++) {
-      const x=col*32+offset;
-      const y=row*16;
-      t.fillStyle=base;
-      t.fillRect(x+1,y+1,30,14);
-      t.fillStyle="rgba(255,255,255,.12)";
-      t.fillRect(x+2,y+2,28,2);
-      t.fillStyle="rgba(0,0,0,.20)";
-      t.fillRect(x+2,y+12,28,2);
-    }
-  }
-
-  let seed=type*12345;
-  function random() {
-    seed=(seed*1664525+1013904223)>>>0;
-    return seed/4294967296;
-  }
-
-  for (let i=0;i<900;i++) {
-    t.fillStyle=random()>0.5
-      ? "rgba(255,255,255,.07)"
-      : "rgba(0,0,0,.10)";
-    t.fillRect(random()*64,random()*64,2,2);
-  }
-
-  return t.getImageData(0,0,64,64).data;
-}
-
-const textures=[
-  null,
-  makeTexture(1),
-  makeTexture(2),
-  makeTexture(3)
-];
-
-function render() {
-  ctx.fillStyle="#444952";
-  ctx.fillRect(0,0,W,H/2);
-  ctx.fillStyle="#343b48";
-  ctx.fillRect(0,H/2,W,H/2);
-
-  const image=ctx.getImageData(0,0,W,H);
-  const pixels=image.data;
-
-  const dirX=Math.cos(player.angle);
-  const dirY=Math.sin(player.angle);
-  const planeX=-dirY*0.66;
-  const planeY=dirX*0.66;
-
-  for (let x=0;x<W;x++) {
-    const cameraX=2*x/W-1;
-    const rayX=dirX+planeX*cameraX;
-    const rayY=dirY+planeY*cameraX;
-
-    let mapX=Math.floor(player.x);
-    let mapY=Math.floor(player.y);
-
-    const deltaX=rayX===0?1e30:Math.abs(1/rayX);
-    const deltaY=rayY===0?1e30:Math.abs(1/rayY);
-
-    const stepX=rayX<0?-1:1;
-    const stepY=rayY<0?-1:1;
-
-    let sideX=(rayX<0
-      ?player.x-mapX:mapX+1-player.x)*deltaX;
-    let sideY=(rayY<0
-      ?player.y-mapY:mapY+1-player.y)*deltaY;
-
-    let side=0,hit=0;
-
-    for (let i=0;i<40;i++) {
-      if (sideX<sideY) {
-        sideX+=deltaX;
-        mapX+=stepX;
-        side=0;
-      } else {
-        sideY+=deltaY;
-        mapY+=stepY;
-        side=1;
-      }
-      hit=wall(mapX,mapY);
-      if (hit) break;
-    }
-
-    if (!hit) continue;
-
-    const distance=Math.max(0.01,
-      side===0?sideX-deltaX:sideY-deltaY);
-
-    const lineHeight=Math.floor(H/distance);
-    const start=Math.max(0,Math.floor((H-lineHeight)/2));
-    const end=Math.min(H,Math.floor((H+lineHeight)/2));
-
-    let wallX=side===0
-      ?player.y+distance*rayY
-      :player.x+distance*rayX;
-    wallX-=Math.floor(wallX);
-
-    let texX=Math.floor(wallX*64);
-    if ((side===0&&rayX>0)||
-        (side===1&&rayY<0)) texX=63-texX;
-
-    const texture=textures[hit]||textures[1];
-    const shade=Math.max(0.25,
-      Math.min(1,1.15-distance*0.075))*
-      (side===1?0.75:1);
-
-    for (let y=start;y<end;y++) {
-      const texY=Math.floor(
-        ((y-H/2+lineHeight/2)/lineHeight)*64
-      )&63;
-
-      const src=(texY*64+texX)*4;
-      const dst=(y*W+x)*4;
-
-      pixels[dst]=texture[src]*shade;
-      pixels[dst+1]=texture[src+1]*shade;
-      pixels[dst+2]=texture[src+2]*shade;
-      pixels[dst+3]=255;
-    }
-  }
-
-  ctx.putImageData(image,0,0);
-
-  // Weapon silhouette
-  ctx.fillStyle="#18191d";
-  ctx.fillRect(148,169,24,31);
-  ctx.fillStyle="#555961";
-  ctx.fillRect(153,151,14,34);
-  ctx.fillStyle="#92969c";
-  ctx.fillRect(157,146,6,30);
-  ctx.fillStyle="#302923";
-  ctx.fillRect(150,185,20,15);
-
-  // Minimap
-  const scale=5,ox=5,oy=5;
-  ctx.fillStyle="rgba(0,0,0,.65)";
-  ctx.fillRect(ox-2,oy-2,MW*scale+4,MH*scale+4);
-
-  for (let y=0;y<MH;y++) {
-    for (let x=0;x<MW;x++) {
-      ctx.fillStyle=wall(x,y)?"#a5a9b1":"#26354b";
-      ctx.fillRect(ox+x*scale,oy+y*scale,scale-1,scale-1);
-    }
-  }
-
-  ctx.fillStyle="#ffdc55";
-  ctx.fillRect(ox+player.x*scale-2,
-               oy+player.y*scale-2,4,4);
-  ctx.strokeStyle="#ffdc55";
-  ctx.beginPath();
-  ctx.moveTo(ox+player.x*scale,oy+player.y*scale);
-  ctx.lineTo(
-    ox+(player.x+Math.cos(player.angle)*2)*scale,
-    oy+(player.y+Math.sin(player.angle)*2)*scale
-  );
-  ctx.stroke();
-
-  screen.imageSmoothingEnabled=false;
-  screen.clearRect(0,0,canvas.width,canvas.height);
-  screen.drawImage(buffer,0,0,canvas.width,canvas.height);
-}
-
-function resize() {
-  const dpr=Math.min(window.devicePixelRatio||1,2);
-  canvas.width=Math.round(innerWidth*dpr);
-  canvas.height=Math.round(innerHeight*dpr);
-  screen.imageSmoothingEnabled=false;
-}
-window.addEventListener("resize",resize);
-resize();
-
-// Controls: track each pointer separately.
-const activePointers=new Map();
-
-const bindings={
-  forward:"forward",
-  back:"back",
-  left:"left",
-  right:"right",
-  turnLeft:"turnLeft",
-  turnRight:"turnRight"
-};
-
-function syncControls() {
-  for (const action of Object.values(bindings)) {
-    let held=false;
-    for (const value of activePointers.values()) {
-      if (value===action) held=true;
-    }
-    if (held) keys.add(action);
-    else keys.delete(action);
-  }
-}
-
-for (const [id,action] of Object.entries(bindings)) {
-  const button=document.getElementById(id);
-
-  button.addEventListener("pointerdown",e=>{
-    e.preventDefault();
-    button.setPointerCapture(e.pointerId);
-    activePointers.set(e.pointerId,action);
-    button.classList.add("pressed");
-    syncControls();
-  });
-
-  function release(e) {
-    activePointers.delete(e.pointerId);
-    button.classList.remove("pressed");
-    syncControls();
-  }
-
-  button.addEventListener("pointerup",release);
-  button.addEventListener("pointercancel",release);
-  button.addEventListener("lostpointercapture",release);
-}
-
-// Prevent Safari scrolling and gesture handling.
-document.addEventListener("touchmove",e=>{
-  e.preventDefault();
-},{passive:false});
-
-document.addEventListener("gesturestart",e=>{
-  e.preventDefault();
-},{passive:false});
-
-document.addEventListener("gesturechange",e=>{
-  e.preventDefault();
-},{passive:false});
-
-// Keyboard controls
-const keyboard={
-  KeyW:"forward",ArrowUp:"forward",
-  KeyS:"back",ArrowDown:"back",
-  KeyA:"left",KeyD:"right",
-  ArrowLeft:"turnLeft",
-  ArrowRight:"turnRight",
-  KeyQ:"turnLeft",KeyE:"turnRight"
-};
-
-window.addEventListener("keydown",e=>{
-  if (keyboard[e.code]) {
-    e.preventDefault();
-    keys.add(keyboard[e.code]);
-  }
-});
-
-window.addEventListener("keyup",e=>{
-  if (keyboard[e.code]) keys.delete(keyboard[e.code]);
-});
-
-window.addEventListener("blur",()=>{
-  keys.clear();
-  activePointers.clear();
-  document.querySelectorAll("button").forEach(
-    b=>b.classList.remove("pressed")
-  );
-});
-
-let previous=performance.now();
-
-function loop(now) {
-  const dt=Math.min((now-previous)/1000,0.05);
-  previous=now;
-
-  if (keys.has("turnLeft")) player.angle-=turnSpeed*dt;
-  if (keys.has("turnRight")) player.angle+=turnSpeed*dt;
-
-  const dx=Math.cos(player.angle);
-  const dy=Math.sin(player.angle);
-  const sx=-dy;
-  const sy=dx;
-
-  let mx=0,my=0;
-
-  if (keys.has("forward")) {mx+=dx;my+=dy;}
-  if (keys.has("back")) {mx-=dx;my-=dy;}
-  if (keys.has("left")) {mx-=sx;my-=sy;}
-  if (keys.has("right")) {mx+=sx;my+=sy;}
-
-  const length=Math.hypot(mx,my);
-  if (length>0) {
-    move(mx/length*moveSpeed*dt,
-         my/length*moveSpeed*dt);
-  }
-
-  render();
-  requestAnimationFrame(loop);
-}
-
-requestAnimationFrame(loop);
+let previous=performance.now();function loop(now){const dt=Math.min((now-previous)/1000,.05);previous=now;update(dt,now);render(now);requestAnimationFrame(loop);}reset();requestAnimationFrame(loop);
 </script>
 </body>
 </html>
