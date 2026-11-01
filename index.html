@@ -218,11 +218,13 @@ document.getElementById('soundToggle').addEventListener('contextmenu',e=>{e.prev
 window.addEventListener('pointerdown',()=>initializeAudio(),{passive:true});
 window.addEventListener('touchstart',()=>initializeAudio(),{passive:true});
 window.addEventListener('keydown',()=>initializeAudio());
+let lastBackTap=-1000;
+function handleBackTap(now){if(now-lastBackTap<320){player.angle=(player.angle+Math.PI)%(Math.PI*2);lastBackTap=-1000;}else lastBackTap=now;}
 const bindings={forward:'forward',back:'back',left:'left',right:'right',turnLeft:'turnLeft',turnRight:'turnRight',fire:'fire'};
 function syncKeys(){keys.clear();for(const action of activePointers.values())keys.add(action);for(const action of keyboardHeld)keys.add(action);}
-for(const [id,action] of Object.entries(bindings)){const b=document.getElementById(id);b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);activePointers.set(e.pointerId,action);b.classList.add('pressed');syncKeys();});function release(e){activePointers.delete(e.pointerId);b.classList.remove('pressed');syncKeys();}b.addEventListener('pointerup',release);b.addEventListener('pointercancel',release);b.addEventListener('lostpointercapture',release);}
+for(const [id,action] of Object.entries(bindings)){const b=document.getElementById(id);b.addEventListener('pointerdown',e=>{e.preventDefault();if(action==='back')handleBackTap(performance.now());b.setPointerCapture(e.pointerId);activePointers.set(e.pointerId,action);b.classList.add('pressed');syncKeys();});function release(e){activePointers.delete(e.pointerId);b.classList.remove('pressed');syncKeys();}b.addEventListener('pointerup',release);b.addEventListener('pointercancel',release);b.addEventListener('lostpointercapture',release);}
 const keyMap={KeyW:'forward',ArrowUp:'forward',KeyS:'back',ArrowDown:'back',KeyA:'left',KeyD:'right',ArrowLeft:'turnLeft',ArrowRight:'turnRight',KeyQ:'turnLeft',KeyE:'turnRight',Space:'fire'};
-window.addEventListener('keydown',e=>{const action=keyMap[e.code];if(action){e.preventDefault();keyboardHeld.add(action);syncKeys();}});
+window.addEventListener('keydown',e=>{const action=keyMap[e.code];if(action){e.preventDefault();if(action==='back'&&!e.repeat&&!keyboardHeld.has(action))handleBackTap(performance.now());keyboardHeld.add(action);syncKeys();}});
 window.addEventListener('keyup',e=>{const action=keyMap[e.code];if(action){keyboardHeld.delete(action);syncKeys();}});
 window.addEventListener('blur',()=>{activePointers.clear();keyboardHeld.clear();syncKeys();document.querySelectorAll('button').forEach(b=>b.classList.remove('pressed'));});
 document.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
@@ -236,7 +238,7 @@ return {distance:maxDistance,hit:0};}
 function visible(ax,ay,bx,by){const dx=bx-ax,dy=by-ay,d=Math.hypot(dx,dy);return rayDistance(ax,ay,dx/d,dy/d,d).distance>=d-.15;}
 const corners=[[1.5,1.5],[14.5,1.5],[1.5,14.5],[14.5,14.5]];
 function spawnEnemy(){const choices=corners.filter(([x,y])=>!solid(x,y,.22)&&Math.hypot(x-player.x,y-player.y)>3);const pool=choices.length?choices:corners.filter(([x,y])=>!solid(x,y,.22));if(!pool.length)return;const [x,y]=pool[Math.floor(Math.random()*pool.length)];enemy={x,y,health:2,hitUntil:0,step:0};spawnAt=0;sound('spawn');}
-function reset(){player.x=3.5;player.y=5.5;player.angle=0;player.health=100;kills=0;enemy=null;gameOver=false;spawnAt=0;flashUntil=0;damageFlashUntil=0;lastShot=0;lastEnemyAttack=0;lastStepSound=0;lastBreathSound=0;lastStaticSound=0;walkPhase=0;walkBlend=0;shotKick=0;impactUntil=0;shakeUntil=0;activePointers.clear();keyboardHeld.clear();syncKeys();document.getElementById('gameover').style.display='none';spawnEnemy();}
+function reset(){player.x=3.5;player.y=5.5;player.angle=0;player.health=100;kills=0;enemy=null;gameOver=false;spawnAt=0;flashUntil=0;damageFlashUntil=0;lastShot=0;lastEnemyAttack=0;lastStepSound=0;lastBreathSound=0;lastStaticSound=0;lastBackTap=-1000;walkPhase=0;walkBlend=0;shotKick=0;impactUntil=0;shakeUntil=0;activePointers.clear();keyboardHeld.clear();syncKeys();document.getElementById('gameover').style.display='none';spawnEnemy();}
 document.getElementById('restart').addEventListener('click',reset);
 function die(){gameOver=true;player.health=0;document.getElementById('finalScore').textContent='Enemies killed: '+kills;document.getElementById('gameover').style.display='flex';}
 function shoot(now){if(gameOver||now-lastShot<300)return;lastShot=now;flashUntil=now+110;sound('shot');shotKick=1;shakeUntil=now+95;if(!enemy)return;const dx=enemy.x-player.x,dy=enemy.y-player.y,dist=Math.hypot(dx,dy),angle=Math.atan2(dy,dx)-player.angle,aim=Math.atan2(Math.sin(angle),Math.cos(angle));if(Math.abs(aim)<Math.atan2(.32,dist)&&visible(player.x,player.y,enemy.x,enemy.y)){enemy.health--;sound('hit');enemy.hitUntil=now+190;impactUntil=now+125;if(enemy.health<=0){enemy=null;kills++;sound('kill');spawnAt=now+5000;}}}
