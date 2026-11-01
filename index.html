@@ -20,6 +20,19 @@ button.pressed{background:#64748b}
 #gameover h1{font-size:clamp(38px,8vw,72px);color:#ed4545;margin:0;text-shadow:3px 3px black}
 #gameover p{font-size:24px;margin:0}
 #restart{font-size:22px;padding:14px 28px;background:#315d41;border-color:#7dc79b}
+
+/* NULLRELAY // operator combat interface */
+#hud{top:max(9px,env(safe-area-inset-top));left:10px;padding:7px 11px 8px;background:linear-gradient(135deg,#09121eea,#172a35e8);border:2px solid #416b79;box-shadow:inset 0 0 0 2px #0a141d,0 0 0 1px #080e15;color:#67dbe1;font-family:monospace;font-size:clamp(11px,1.7vw,16px);letter-spacing:1px;text-shadow:0 0 7px #27aebc70;line-height:1.45}
+#hud:before{content:'◈  NULLRELAY / OPERATOR LINK';display:block;color:#b38ec1;font-size:clamp(9px,1.25vw,12px);border-bottom:1px solid #34505e;margin-bottom:3px;padding-bottom:3px}
+#wave{color:#d39abf}
+#controls{bottom:max(12px,env(safe-area-inset-bottom));left:clamp(8px,3vw,40px);grid-template-columns:repeat(3,clamp(50px,8vw,68px));grid-template-rows:repeat(2,clamp(50px,8vw,68px));gap:4px;padding:8px;background:#0a1520e8;border:2px solid #385565;box-shadow:inset 0 0 0 2px #142735,0 0 0 2px #050b12}
+button{border:2px solid #517482;border-radius:0;background:linear-gradient(145deg,#314654,#172732 55%,#101b27);color:#78dce4;font-family:monospace;font-size:clamp(23px,3.6vw,29px);font-weight:900;text-shadow:0 0 8px #32a4b4;box-shadow:inset 2px 2px #63818a,inset -3px -3px #07131d;touch-action:none}
+button.pressed{background:#366878;color:#d7ffff;box-shadow:inset 3px 3px #08141b}
+#fire{right:clamp(12px,5vw,70px);bottom:max(20px,env(safe-area-inset-bottom));width:clamp(96px,15vw,126px);height:clamp(96px,15vw,126px);border-radius:0;clip-path:polygon(16% 0,84% 0,100% 16%,100% 84%,84% 100%,16% 100%,0 84%,0 16%);border:4px solid #c267a6;background:linear-gradient(145deg,#69324f,#321a36 70%);color:#f3a9d8;letter-spacing:2px;font-size:clamp(16px,2.8vw,22px);text-shadow:0 0 10px #d44d9c;box-shadow:inset 0 0 0 5px #1b1224}
+#fire.pressed{background:#a04479;color:#fff}
+#gameover{background:#070e19f2;color:#9ce3e4;font-family:monospace}
+#gameover h1{color:#e06aa7;letter-spacing:4px}
+#restart{border-color:#6db7bb;background:#163844;color:#a3f0ed;border-radius:0;letter-spacing:2px}
 </style>
 </head>
 <body>
@@ -29,7 +42,7 @@ button.pressed{background:#64748b}
 <button id="turnLeft">↶</button><button id="forward">▲</button><button id="turnRight">↷</button>
 <button id="left">◀</button><button id="back">▼</button><button id="right">▶</button>
 </div>
-<button id="fire">FIRE</button>
+<button id="fire" aria-label="Fire weapon">FIRE</button>
 <div id="gameover"><h1>GAME OVER</h1><p id="finalScore"></p><button id="restart">RESTART</button></div>
 <script>
 'use strict';
