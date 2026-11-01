@@ -102,6 +102,11 @@ for(let x=0;x<W;x++){const tx=((Math.floor((wx-Math.floor(wx))*64))&63),ty=((Mat
 pixels[dst]=tex[src]*shade;pixels[dst+1]=tex[src+1]*shade;pixels[dst+2]=tex[src+2]*shade;pixels[dst+3]=255;wx+=stepX;wy+=stepY;}
 }}
 
+// Precomputed animation frames keep the per-pixel renderer inexpensive.
+const reclaimedFrames=[makeGuard()];
+function variantSprite(base,phase){const out=new Uint8ClampedArray(base);if(phase===1){for(let y=29;y<49;y++)for(let x=2;x<8;x++){const a=(y*32+x)*4,b=(y*32+Math.min(31,x+1))*4;out.set(base.slice(b,b+4),a);}}return out;}
+reclaimedFrames.push(variantSprite(reclaimedFrames[0],1));
+let walkPhase=0,walkBlend=0,shotKick=0,impactUntil=0,shakeUntil=0,lightPulse=1;
 const guardPixels=makeGuard(),zBuffer=new Float32Array(W);
 const player={x:3.5,y:5.5,angle:0,health:100};
 let enemy=null,kills=0,spawnAt=0,gameOver=false,flashUntil=0,damageFlashUntil=0,lastShot=0,lastEnemyAttack=0;
@@ -123,39 +128,41 @@ for(let i=0;i<64;i++){if(sx<sy){sx+=deltaX;mx+=stepX;side=0;}else{sy+=deltaY;my+
 return {distance:maxDistance,hit:0};}
 function visible(ax,ay,bx,by){const dx=bx-ax,dy=by-ay,d=Math.hypot(dx,dy);return rayDistance(ax,ay,dx/d,dy/d,d).distance>=d-.15;}
 const corners=[[1.5,1.5],[14.5,1.5],[1.5,14.5],[14.5,14.5]];
-function spawnEnemy(){const choices=corners.filter(([x,y])=>!solid(x,y,.22)&&Math.hypot(x-player.x,y-player.y)>3);const pool=choices.length?choices:corners.filter(([x,y])=>!solid(x,y,.22));if(!pool.length)return;const [x,y]=pool[Math.floor(Math.random()*pool.length)];enemy={x,y,health:2};spawnAt=0;}
-function reset(){player.x=3.5;player.y=5.5;player.angle=0;player.health=100;kills=0;enemy=null;gameOver=false;spawnAt=0;flashUntil=0;damageFlashUntil=0;lastShot=0;lastEnemyAttack=0;activePointers.clear();keyboardHeld.clear();syncKeys();document.getElementById('gameover').style.display='none';spawnEnemy();}
+function spawnEnemy(){const choices=corners.filter(([x,y])=>!solid(x,y,.22)&&Math.hypot(x-player.x,y-player.y)>3);const pool=choices.length?choices:corners.filter(([x,y])=>!solid(x,y,.22));if(!pool.length)return;const [x,y]=pool[Math.floor(Math.random()*pool.length)];enemy={x,y,health:2,hitUntil:0,step:0};spawnAt=0;}
+function reset(){player.x=3.5;player.y=5.5;player.angle=0;player.health=100;kills=0;enemy=null;gameOver=false;spawnAt=0;flashUntil=0;damageFlashUntil=0;lastShot=0;lastEnemyAttack=0;walkPhase=0;walkBlend=0;shotKick=0;impactUntil=0;shakeUntil=0;activePointers.clear();keyboardHeld.clear();syncKeys();document.getElementById('gameover').style.display='none';spawnEnemy();}
 document.getElementById('restart').addEventListener('click',reset);
 function die(){gameOver=true;player.health=0;document.getElementById('finalScore').textContent='Enemies killed: '+kills;document.getElementById('gameover').style.display='flex';}
-function shoot(now){if(gameOver||now-lastShot<300)return;lastShot=now;flashUntil=now+110;if(!enemy)return;const dx=enemy.x-player.x,dy=enemy.y-player.y,dist=Math.hypot(dx,dy),angle=Math.atan2(dy,dx)-player.angle,aim=Math.atan2(Math.sin(angle),Math.cos(angle));if(Math.abs(aim)<Math.atan2(.32,dist)&&visible(player.x,player.y,enemy.x,enemy.y)){enemy.health--;if(enemy.health<=0){enemy=null;kills++;spawnAt=now+5000;}}}
+function shoot(now){if(gameOver||now-lastShot<300)return;lastShot=now;flashUntil=now+110;shotKick=1;shakeUntil=now+95;if(!enemy)return;const dx=enemy.x-player.x,dy=enemy.y-player.y,dist=Math.hypot(dx,dy),angle=Math.atan2(dy,dx)-player.angle,aim=Math.atan2(Math.sin(angle),Math.cos(angle));if(Math.abs(aim)<Math.atan2(.32,dist)&&visible(player.x,player.y,enemy.x,enemy.y)){enemy.health--;enemy.hitUntil=now+190;impactUntil=now+125;if(enemy.health<=0){enemy=null;kills++;spawnAt=now+5000;}}}
 function update(dt,now){if(gameOver)return;
 if(keys.has('turnLeft'))player.angle-=2.3*dt;if(keys.has('turnRight'))player.angle+=2.3*dt;
 const dx=Math.cos(player.angle),dy=Math.sin(player.angle),sx=-dy,sy=dx;let mx=0,my=0;
 if(keys.has('forward')){mx+=dx;my+=dy;}if(keys.has('back')){mx-=dx;my-=dy;}if(keys.has('left')){mx-=sx;my-=sy;}if(keys.has('right')){mx+=sx;my+=sy;}
-const len=Math.hypot(mx,my);if(len){const vx=mx/len*2.8*dt,vy=my/len*2.8*dt;if(!solid(player.x+vx,player.y))player.x+=vx;if(!solid(player.x,player.y+vy))player.y+=vy;}
+const len=Math.hypot(mx,my);let moved=0;if(len){const oldX=player.x,oldY=player.y,vx=mx/len*2.8*dt,vy=my/len*2.8*dt;if(!solid(player.x+vx,player.y))player.x+=vx;if(!solid(player.x,player.y+vy))player.y+=vy;moved=Math.hypot(player.x-oldX,player.y-oldY);}walkBlend+=(Number(moved>0)-walkBlend)*Math.min(1,dt*12);if(moved>0)walkPhase+=moved*10;shotKick=Math.max(0,shotKick-dt*6);
 if(keys.has('fire'))shoot(now);
 if(!enemy&&spawnAt&&now>=spawnAt)spawnEnemy();
-if(enemy){const ex=player.x-enemy.x,ey=player.y-enemy.y,d=Math.hypot(ex,ey);if(d>0.8){const speed=1.05*dt;if(!solid(enemy.x+ex/d*speed,enemy.y,.23))enemy.x+=ex/d*speed;if(!solid(enemy.x,enemy.y+ey/d*speed,.23))enemy.y+=ey/d*speed;}
+if(enemy){const ex=player.x-enemy.x,ey=player.y-enemy.y,d=Math.hypot(ex,ey);if(d>0.8){enemy.step+=dt*5;const speed=1.05*dt;if(!solid(enemy.x+ex/d*speed,enemy.y,.23))enemy.x+=ex/d*speed;if(!solid(enemy.x,enemy.y+ey/d*speed,.23))enemy.y+=ey/d*speed;}
 if(d<1.25&&visible(enemy.x,enemy.y,player.x,player.y)&&now-lastEnemyAttack>900){lastEnemyAttack=now;player.health=Math.max(0,player.health-10);damageFlashUntil=now+180;if(player.health<=0)die();}}
 }
 function render(now){const image=ctx.createImageData(W,H),pixels=image.data;
 const dirX=Math.cos(player.angle),dirY=Math.sin(player.angle),planeX=-dirY*.66,planeY=dirX*.66;
 drawSurfaces(pixels,dirX,dirY,planeX,planeY);
-for(let x=0;x<W;x++){const cameraX=2*x/W-1,rayX=dirX+planeX*cameraX,rayY=dirY+planeY*cameraX;const hit=rayDistance(player.x,player.y,rayX,rayY);if(!hit.hit){zBuffer[x]=30;continue;}const distance=hit.distance;zBuffer[x]=distance;const lineHeight=Math.floor(H/distance),start=Math.max(0,Math.floor((H-lineHeight)/2)),end=Math.min(H,Math.floor((H+lineHeight)/2));let texX=Math.floor(hit.wallX*64);if((hit.side===0&&rayX>0)||(hit.side===1&&rayY<0))texX=63-texX;const texture=textures[hit.hit]||textures[1],shade=Math.max(.25,Math.min(1,1.15-distance*.075))*(hit.side===1?.75:1);
-for(let y=start;y<end;y++){const texY=Math.floor(((y-H/2+lineHeight/2)/lineHeight)*64)&63,src=(texY*64+texX)*4,dst=(y*W+x)*4;pixels[dst]=texture[src]*shade;pixels[dst+1]=texture[src+1]*shade;pixels[dst+2]=texture[src+2]*shade;pixels[dst+3]=255;}}
+for(let x=0;x<W;x++){const cameraX=2*x/W-1,rayX=dirX+planeX*cameraX,rayY=dirY+planeY*cameraX;const hit=rayDistance(player.x,player.y,rayX,rayY);if(!hit.hit){zBuffer[x]=30;continue;}const distance=hit.distance;zBuffer[x]=distance;const lineHeight=Math.floor(H/distance),start=Math.max(0,Math.floor((H-lineHeight)/2)),end=Math.min(H,Math.floor((H+lineHeight)/2));let texX=Math.floor(hit.wallX*64);if((hit.side===0&&rayX>0)||(hit.side===1&&rayY<0))texX=63-texX;const texture=textures[hit.hit]||textures[1],flicker=(Math.sin(now*.0023+Math.floor(player.x)*3)*Math.sin(now*.0037+Math.floor(player.y)*5)>.91?.58:1),shade=Math.max(.25,Math.min(1,1.15-distance*.075))*(hit.side===1?.75:1)*flicker;
+for(let y=start;y<end;y++){const texY=Math.floor(((y-H/2+lineHeight/2)/lineHeight)*64)&63,src=(texY*64+texX)*4,dst=(y*W+x)*4;let rr=texture[src],gg=texture[src+1],bb=texture[src+2];if(hit.hit===2&&texY>=9&&texY<=12&&texX>=10&&texX<=21){const blink=Math.floor(now/350)%4!==0;rr=blink?45:12;gg=blink?215:40;bb=blink?226:56;}if(hit.hit===3&&texY>=12&&texY<=13&&texX>=12&&texX<=19){rr=Math.floor(now/230)%3?215:60;gg=35;bb=155;}pixels[dst]=rr*shade;pixels[dst+1]=gg*shade;pixels[dst+2]=bb*shade;pixels[dst+3]=255;}}
 // Enemy billboard with wall-depth occlusion.
 if(enemy){const spriteX=enemy.x-player.x,spriteY=enemy.y-player.y,invDet=1/(planeX*dirY-dirX*planeY),transformX=invDet*(dirY*spriteX-dirX*spriteY),transformY=invDet*(-planeY*spriteX+planeX*spriteY);
 if(transformY>.1){const spriteScreenX=Math.floor(W/2*(1+transformX/transformY)),spriteHeight=Math.abs(Math.floor(H/transformY)),spriteWidth=Math.floor(spriteHeight*.5),startY=Math.floor(H/2-spriteHeight/2),startX=Math.floor(spriteScreenX-spriteWidth/2),endX=startX+spriteWidth;
-for(let stripe=Math.max(0,startX);stripe<Math.min(W,endX);stripe++){if(transformY>=zBuffer[stripe]||spriteWidth<=0)continue;const tx=Math.floor((stripe-startX)/spriteWidth*32);for(let y=Math.max(0,startY);y<Math.min(H,startY+spriteHeight);y++){const ty=Math.floor((y-startY)/spriteHeight*64);if(tx<0||tx>=32||ty<0||ty>=64)continue;const src=(ty*32+tx)*4;if(!guardPixels[src+3])continue;const dst=(y*W+stripe)*4,shade=Math.max(.4,1-transformY*.035);pixels[dst]=guardPixels[src]*shade;pixels[dst+1]=guardPixels[src+1]*shade;pixels[dst+2]=guardPixels[src+2]*shade;pixels[dst+3]=255;}}}}
+for(let stripe=Math.max(0,startX);stripe<Math.min(W,endX);stripe++){if(transformY>=zBuffer[stripe]||spriteWidth<=0)continue;const tx=Math.floor((stripe-startX)/spriteWidth*32);for(let y=Math.max(0,startY);y<Math.min(H,startY+spriteHeight);y++){const ty=Math.floor((y-startY)/spriteHeight*64);if(tx<0||tx>=32||ty<0||ty>=64)continue;const sprite=reclaimedFrames[Math.floor(enemy.step)%2],src=(ty*32+tx)*4;if(!sprite[src+3])continue;const dst=(y*W+stripe)*4,shade=Math.max(.4,1-transformY*.035);const hitFlash=now<enemy.hitUntil;pixels[dst]=hitFlash?245:sprite[src]*shade;pixels[dst+1]=hitFlash?120:sprite[src+1]*shade;pixels[dst+2]=hitFlash?177:sprite[src+2]*shade;pixels[dst+3]=255;}}}}
 ctx.putImageData(image,0,0);
 // Weapon and muzzle flash.
+const bobX=Math.round(Math.sin(walkPhase)*2*walkBlend),bobY=Math.round(Math.abs(Math.cos(walkPhase))*3*walkBlend),recoil=Math.round(shotKick*9);ctx.save();ctx.translate(bobX,bobY+recoil);
 ctx.fillStyle='#18191d';ctx.fillRect(143,171,34,29);ctx.fillStyle='#555961';ctx.fillRect(151,151,18,37);ctx.fillStyle='#92969c';ctx.fillRect(156,143,8,34);ctx.fillStyle='#302923';ctx.fillRect(148,185,24,15);
-if(now<flashUntil){ctx.fillStyle='#fff1a1';ctx.fillRect(154,123,12,22);ctx.fillRect(146,130,28,8);ctx.fillStyle='#ffad22';ctx.fillRect(157,128,6,15);}
+if(now<flashUntil){ctx.fillStyle='#fff1a1';ctx.fillRect(154,123,12,22);ctx.fillRect(146,130,28,8);ctx.fillStyle='#ffad22';ctx.fillRect(157,128,6,15);}ctx.restore();
 ctx.strokeStyle='#e6dfbb';ctx.beginPath();ctx.moveTo(155,100);ctx.lineTo(159,100);ctx.moveTo(161,100);ctx.lineTo(165,100);ctx.moveTo(160,95);ctx.lineTo(160,98);ctx.moveTo(160,102);ctx.lineTo(160,105);ctx.stroke();
+if(now<impactUntil){ctx.fillStyle='#e148b4';ctx.fillRect(157,97,6,2);ctx.fillRect(159,95,2,6);}
 // Minimap.
 const scale=5,ox=5,oy=5;ctx.fillStyle='#000a';ctx.fillRect(ox-2,oy-2,MW*scale+4,MH*scale+4);for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){ctx.fillStyle=wall(x,y)?'#a5a9b1':'#26354b';ctx.fillRect(ox+x*scale,oy+y*scale,scale-1,scale-1);}if(enemy){ctx.fillStyle='#e148b4';ctx.fillRect(ox+enemy.x*scale-2,oy+enemy.y*scale-2,4,4);}ctx.fillStyle='#45d5df';ctx.fillRect(ox+player.x*scale-2,oy+player.y*scale-2,4,4);ctx.strokeStyle='#45d5df';ctx.beginPath();ctx.moveTo(ox+player.x*scale,oy+player.y*scale);ctx.lineTo(ox+(player.x+Math.cos(player.angle)*2)*scale,oy+(player.y+Math.sin(player.angle)*2)*scale);ctx.stroke();
 if(now<damageFlashUntil){ctx.fillStyle='#ff00004d';ctx.fillRect(0,0,W,H);}
-screen.imageSmoothingEnabled=false;screen.drawImage(buffer,0,0,canvas.width,canvas.height);
+screen.imageSmoothingEnabled=false;const shake=now<shakeUntil?Math.round(Math.sin(now*.25)*2):0;screen.drawImage(buffer,shake,0,canvas.width,canvas.height);
 document.getElementById('stats').textContent='NULLRELAY_091 | HEALTH '+player.health+' | KILLS '+kills;
 document.getElementById('wave').textContent=enemy?'RECLAIMED DETECTED':spawnAt?'NEXT SIGNAL IN '+Math.max(0,Math.ceil((spawnAt-now)/1000))+'s':'SIGNAL: SEARCHING';
 }
