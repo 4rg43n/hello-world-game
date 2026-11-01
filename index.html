@@ -33,12 +33,12 @@ button.pressed{background:#366878;color:#d7ffff;box-shadow:inset 3px 3px #08141b
 #gameover{background:#070e19f2;color:#9ce3e4;font-family:monospace}
 #gameover h1{color:#e06aa7;letter-spacing:4px}
 #restart{border-color:#6db7bb;background:#163844;color:#a3f0ed;border-radius:0;letter-spacing:2px}
-#soundToggle{pointer-events:auto;margin-top:5px;padding:3px 7px;border:1px solid #517482;background:#101e29;color:#83dfe1;font-size:11px;letter-spacing:1px;box-shadow:none}
+#soundToggle,#muteToggle{pointer-events:auto;margin-top:5px;padding:3px 7px;border:1px solid #517482;background:#101e29;color:#83dfe1;font-size:11px;letter-spacing:1px;box-shadow:none}
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
-<div id="hud"><div id="stats">NULLRELAY_091 | HEALTH 100 | KILLS 0</div><div id="wave">SIGNAL: SEARCHING</div><button id="soundToggle" type="button" aria-label="Toggle game sound" aria-pressed="true">SND ON</button></div>
+<div id="hud"><div id="stats">NULLRELAY_091 | HEALTH 100 | KILLS 0</div><div id="wave">SIGNAL: SEARCHING</div><button id="soundToggle" type="button" aria-label="Test or enable game sound" aria-pressed="true">SND ON</button><button id="muteToggle" type="button" aria-label="Mute or unmute game audio">MUTE</button></div>
 <div id="controls">
 <button id="turnLeft">↶</button><button id="forward">▲</button><button id="turnRight">↷</button>
 <button id="left">◀</button><button id="back">▼</button><button id="right">▶</button>
@@ -116,11 +116,13 @@ let enemy=null,kills=0,spawnAt=0,gameOver=false,flashUntil=0,damageFlashUntil=0,
 const AudioClass=window.AudioContext||window.webkitAudioContext;
 let audio=null,master=null,noiseBuffer=null,humOsc=null,humGain=null,lastStepSound=0,lastBreathSound=0,lastStaticSound=0;
 let soundEnabled=true;
-function initializeAudio(){
- if(!soundEnabled||!AudioClass)return;
+function audioStatus(message){const el=document.getElementById('soundToggle');if(el&&soundEnabled)el.textContent=message;}
+function initializeAudio(test=false){
+ if(!soundEnabled)return;
+ if(!AudioClass){audioStatus('AUDIO N/A');return;}
  try{
   if(!audio){
-   audio=new AudioClass();master=audio.createGain();master.gain.value=.24;master.connect(audio.destination);
+   audio=new AudioClass();master=audio.createGain();master.gain.value=.55;master.connect(audio.destination);
    noiseBuffer=audio.createBuffer(1,audio.sampleRate,audio.sampleRate);
    const data=noiseBuffer.getChannelData(0);let seed=73191;
    for(let i=0;i<data.length;i++){seed=(Math.imul(seed,1664525)+1013904223)>>>0;data[i]=(seed/2147483648-1);}
@@ -129,8 +131,15 @@ function initializeAudio(){
    humGain=audio.createGain();humGain.gain.value=.045;
    humOsc.connect(filter);filter.connect(humGain);humGain.connect(master);humOsc.start();
   }
-  if(audio.state==='suspended')audio.resume().catch(()=>{});
- }catch(e){console.warn('Audio unavailable:',e);soundEnabled=false;}
+  // Safari/iOS requires resume to be invoked directly inside a trusted gesture.
+  const resumed=audio.state==='running'?Promise.resolve():audio.resume();
+  if(test){
+   Promise.resolve(resumed).then(()=>{
+    if(audio.state==='running'){audioStatus('SND READY');tone(660,440,.25,.34,'square');}
+    else audioStatus('SND BLOCKED');
+   }).catch(()=>audioStatus('SND BLOCKED'));
+  }else if(audio.state==='running'){audioStatus('SND ON');}
+ }catch(e){console.warn('Audio unavailable:',e);audioStatus('AUDIO ERR');}
 }
 function tone(freq,endFreq,duration,volume,type='sawtooth',delay=0){
  if(!audio||audio.state!=='running'||!soundEnabled)return;
@@ -165,14 +174,20 @@ function sound(name){
 function setSoundEnabled(value){
  soundEnabled=value;document.getElementById('soundToggle').textContent=value?'SND ON':'SND OFF';
  document.getElementById('soundToggle').setAttribute('aria-pressed',String(value));
- if(value){initializeAudio();if(master)master.gain.value=.24;}
+ if(value){if(master)master.gain.value=.55;initializeAudio(true);}
  else if(master)master.gain.value=0;
 }
 
 const keys=new Set(),activePointers=new Map(),keyboardHeld=new Set();
-document.getElementById('soundToggle').addEventListener('click',()=>setSoundEnabled(!soundEnabled));
-window.addEventListener('pointerdown',initializeAudio,{passive:true});
-window.addEventListener('keydown',initializeAudio);
+document.getElementById('muteToggle').addEventListener('click',()=>{setSoundEnabled(!soundEnabled);document.getElementById('muteToggle').textContent=soundEnabled?'MUTE':'UNMUTE';});
+document.getElementById('soundToggle').addEventListener('click',()=>{
+ if(!soundEnabled)setSoundEnabled(true);
+ else initializeAudio(true); // Tapping SND ON plays an audible diagnostic tone.
+});
+document.getElementById('soundToggle').addEventListener('contextmenu',e=>{e.preventDefault();setSoundEnabled(false);});
+window.addEventListener('pointerdown',()=>initializeAudio(),{passive:true});
+window.addEventListener('touchstart',()=>initializeAudio(),{passive:true});
+window.addEventListener('keydown',()=>initializeAudio());
 const bindings={forward:'forward',back:'back',left:'left',right:'right',turnLeft:'turnLeft',turnRight:'turnRight',fire:'fire'};
 function syncKeys(){keys.clear();for(const action of activePointers.values())keys.add(action);for(const action of keyboardHeld)keys.add(action);}
 for(const [id,action] of Object.entries(bindings)){const b=document.getElementById(id);b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);activePointers.set(e.pointerId,action);b.classList.add('pressed');syncKeys();});function release(e){activePointers.delete(e.pointerId);b.classList.remove('pressed');syncKeys();}b.addEventListener('pointerup',release);b.addEventListener('pointercancel',release);b.addEventListener('lostpointercapture',release);}
