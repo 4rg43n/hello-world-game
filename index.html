@@ -55,8 +55,10 @@ const map=[
 '1000100001002201','1000000000002001','1000000000002001','1000111000000001',
 '1000100000111001','1000100000100001','1000000000100001','1000000000000001',
 '1000330000000001','1000030000000001','1000000000000001','1111111111111111'];
+// Corruption is localized to existing wall panels; navigation remains unchanged.
+const infestation=new Set(['4,4','5,4','6,4','4,7','5,7','6,7','10,8','11,8','12,8','10,9','11,9','12,9','3,12','4,12','5,12','12,5','12,6']);
 const MW=map[0].length,MH=map.length;
-function wall(x,y){if(x<0||y<0||x>=MW||y>=MH)return 1;return Number(map[y][x]);}
+function wall(x,y){if(x<0||y<0||x>=MW||y>=MH)return 1;const type=Number(map[y][x]);return type&&infestation.has(x+','+y)?4:type;}
 function solid(x,y,r=.2){return !!(wall(Math.floor(x-r),Math.floor(y-r))||wall(Math.floor(x+r),Math.floor(y-r))||wall(Math.floor(x-r),Math.floor(y+r))||wall(Math.floor(x+r),Math.floor(y+r)));}
 function makeTexture(type){const c=document.createElement('canvas');c.width=c.height=64;const t=c.getContext('2d');t.imageSmoothingEnabled=false;
 const palettes={1:['#171f2c','#303b4c','#566173','#0a111b','#25a5a9'],2:['#101f2d','#263e50','#46687a','#07131d','#43d5e2'],3:['#291d2b','#554052','#815563','#170f20','#d34ba9']};
@@ -68,7 +70,18 @@ else{r(x+9,y+8,14,15,dark);r(x+11,y+10,10,11,black);r(x+12,y+12,8,2,glow);r(x+12
 if(type===3){r(42,5,8,54,'#492336');r(44,5,3,54,'#a05c70');r(38,30,18,5,'#733d51');r(40,42,16,4,'#bd6377');}
 let seed=type*91237;const rand=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);for(let i=0;i<240;i++){r(Math.floor(rand()*64),Math.floor(rand()*64),1,1,rand()>.5?'#ffffff18':'#00000030');}
 return t.getImageData(0,0,64,64).data;}
-const textures=[null,makeTexture(1),makeTexture(2),makeTexture(3)];
+// Infested bulkhead: exposed sinew gripping the steel seams, with embedded hardware.
+function makeInfestedTexture(){const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');g.imageSmoothingEnabled=false;
+const base=makeTexture(3),img=g.createImageData(64,64);img.data.set(base);g.putImageData(img,0,0);
+const r=(color,x,y,w,h)=>{g.fillStyle=color;g.fillRect(x,y,w,h);};
+let seed=44291;const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+for(let i=0;i<8;i++){const x=Math.floor(rand()*64),y=Math.floor(rand()*64),w=7+Math.floor(rand()*18),h=8+Math.floor(rand()*16);
+r('#261821',x,y,w,h);r('#633642',x+2,y+1,w-3,h-3);r('#955460',x+4,y+3,Math.max(2,w-7),Math.max(2,h-7));}
+for(let i=0;i<13;i++){let x=Math.floor(rand()*64),y=Math.floor(rand()*64);const dx=rand()>.5?1:-1;
+for(let j=0;j<12;j++){r(j%3===0?'#b77876':'#5c303f',x,y,2+(j%2),2);x=(x+dx+64)%64;y=(y+(j%3===0?1:0))%64;}}
+for(let i=0;i<6;i++){const x=Math.floor(rand()*58),y=Math.floor(rand()*58);r('#2b1624',x,y,6,5);r('#d94d91',x+2,y+1,2,2);r('#f1a1ba',x+2,y+1,1,1);}
+return g.getImageData(0,0,64,64).data;}
+const textures=[null,makeTexture(1),makeTexture(2),makeTexture(3),makeInfestedTexture()];
 // Reclaimed: corrupted station personnel fused with security hardware.
 function makeGuard(){const c=document.createElement('canvas');c.width=32;c.height=64;const g=c.getContext('2d');g.imageSmoothingEnabled=false;
 const r=(color,x,y,w,h)=>{g.fillStyle=color;g.fillRect(x,y,w,h)};
@@ -92,15 +105,24 @@ for(const p of [[6,6],[54,6],[6,54],[54,54]])r('#8b9da1',p[0],p[1],3,3);
 if(ceiling){r('#0b1d2a',19,18,26,28);r('#2c5663',21,20,22,24);r('#44c3ca',23,22,18,20);r('#a2e4dc',26,25,12,14);r('#1c4352',23,41,18,3);}
 else{r('#101c25',18,18,28,28);for(let i=0;i<5;i++){r('#536977',20+i*5,20,2,24);r('#152630',20,22+i*5,24,2);}r('#2d8995',28,7,8,2);r('#225762',28,55,8,2);}
 return t.getImageData(0,0,64,64).data;}
-const floorPixels=makeSurface(false),ceilingPixels=makeSurface(true);
+function makeOrganicSurface(ceiling){const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');const base=makeSurface(ceiling),img=g.createImageData(64,64);img.data.set(base);g.putImageData(img,0,0);
+const r=(color,x,y,w,h)=>{g.fillStyle=color;g.fillRect(x,y,w,h);};
+r('#241923',3,6,35,20);r('#56313d',5,8,31,16);r('#804651',8,10,24,11);r('#a36967',11,13,15,4);
+for(let i=0;i<9;i++){const x=(i*17+9)%57,y=(i*11+7)%57;r(i%2?'#492632':'#9b5660',x,y,4+(i%3)*2,13);r('#bd7770',x+1,y+2,2,7);}
+r('#301c2a',42,38,16,18);r('#8c4957',44,40,11,13);r('#d35a86',48,44,3,4);
+return g.getImageData(0,0,64,64).data;}
+const floorPixels=makeSurface(false),ceilingPixels=makeSurface(true),organicFloor=makeOrganicSurface(false),organicCeiling=makeOrganicSurface(true);
+function corruptedTile(x,y){const ix=Math.floor(x),iy=Math.floor(y);if(ix<0||iy<0||ix>=MW||iy>=MH)return false;
+const near=infestation.has(ix+','+iy)||infestation.has((ix+1)+','+iy)||infestation.has(ix+','+(iy+1));
+return near&&((ix*13+iy*7)%4!==0);}
 function drawSurfaces(pixels,dirX,dirY,planeX,planeY){
 const leftX=dirX-planeX,leftY=dirY-planeY,rightX=dirX+planeX,rightY=dirY+planeY;
 for(let y=0;y<H;y++){const offset=y-H/2;if(!offset)continue;
 const floor=offset>0,depth=(H*.5)/Math.abs(offset),stepX=depth*(rightX-leftX)/W,stepY=depth*(rightY-leftY)/W;
 let wx=player.x+depth*leftX,wy=player.y+depth*leftY;const tex=floor?floorPixels:ceilingPixels;
 const shade=Math.max(.35,Math.min(.95,1.1-depth*.075));
-for(let x=0;x<W;x++){const tx=((Math.floor((wx-Math.floor(wx))*64))&63),ty=((Math.floor((wy-Math.floor(wy))*64))&63),src=(ty*64+tx)*4,dst=(y*W+x)*4;
-pixels[dst]=tex[src]*shade;pixels[dst+1]=tex[src+1]*shade;pixels[dst+2]=tex[src+2]*shade;pixels[dst+3]=255;wx+=stepX;wy+=stepY;}
+for(let x=0;x<W;x++){const tx=((Math.floor((wx-Math.floor(wx))*64))&63),ty=((Math.floor((wy-Math.floor(wy))*64))&63),src=(ty*64+tx)*4,dst=(y*W+x)*4,activeTex=corruptedTile(wx,wy)?(floor?organicFloor:organicCeiling):tex;
+pixels[dst]=activeTex[src]*shade;pixels[dst+1]=activeTex[src+1]*shade;pixels[dst+2]=activeTex[src+2]*shade;pixels[dst+3]=255;wx+=stepX;wy+=stepY;}
 }}
 
 // Precomputed animation frames keep the per-pixel renderer inexpensive.
@@ -226,7 +248,7 @@ function render(now){const image=ctx.createImageData(W,H),pixels=image.data;
 const dirX=Math.cos(player.angle),dirY=Math.sin(player.angle),planeX=-dirY*.66,planeY=dirX*.66;
 drawSurfaces(pixels,dirX,dirY,planeX,planeY);
 for(let x=0;x<W;x++){const cameraX=2*x/W-1,rayX=dirX+planeX*cameraX,rayY=dirY+planeY*cameraX;const hit=rayDistance(player.x,player.y,rayX,rayY);if(!hit.hit){zBuffer[x]=30;continue;}const distance=hit.distance;zBuffer[x]=distance;const lineHeight=Math.floor(H/distance),start=Math.max(0,Math.floor((H-lineHeight)/2)),end=Math.min(H,Math.floor((H+lineHeight)/2));let texX=Math.floor(hit.wallX*64);if((hit.side===0&&rayX>0)||(hit.side===1&&rayY<0))texX=63-texX;const texture=textures[hit.hit]||textures[1],flicker=(Math.sin(now*.0023+Math.floor(player.x)*3)*Math.sin(now*.0037+Math.floor(player.y)*5)>.91?.58:1),shade=Math.max(.25,Math.min(1,1.15-distance*.075))*(hit.side===1?.75:1)*flicker;
-for(let y=start;y<end;y++){const texY=Math.floor(((y-H/2+lineHeight/2)/lineHeight)*64)&63,src=(texY*64+texX)*4,dst=(y*W+x)*4;let rr=texture[src],gg=texture[src+1],bb=texture[src+2];if(hit.hit===2&&texY>=9&&texY<=12&&texX>=10&&texX<=21){const blink=Math.floor(now/350)%4!==0;rr=blink?45:12;gg=blink?215:40;bb=blink?226:56;}if(hit.hit===3&&texY>=12&&texY<=13&&texX>=12&&texX<=19){rr=Math.floor(now/230)%3?215:60;gg=35;bb=155;}pixels[dst]=rr*shade;pixels[dst+1]=gg*shade;pixels[dst+2]=bb*shade;pixels[dst+3]=255;}}
+for(let y=start;y<end;y++){const texY=Math.floor(((y-H/2+lineHeight/2)/lineHeight)*64)&63,src=(texY*64+texX)*4,dst=(y*W+x)*4;let rr=texture[src],gg=texture[src+1],bb=texture[src+2];if(hit.hit===2&&texY>=9&&texY<=12&&texX>=10&&texX<=21){const blink=Math.floor(now/350)%4!==0;rr=blink?45:12;gg=blink?215:40;bb=blink?226:56;}if((hit.hit===3||hit.hit===4)&&texY>=12&&texY<=13&&texX>=12&&texX<=19){rr=Math.floor(now/230)%3?215:60;gg=35;bb=155;}pixels[dst]=rr*shade;pixels[dst+1]=gg*shade;pixels[dst+2]=bb*shade;pixels[dst+3]=255;}}
 // Enemy billboard with wall-depth occlusion.
 if(enemy){const spriteX=enemy.x-player.x,spriteY=enemy.y-player.y,invDet=1/(planeX*dirY-dirX*planeY),transformX=invDet*(dirY*spriteX-dirX*spriteY),transformY=invDet*(-planeY*spriteX+planeX*spriteY);
 if(transformY>.1){const spriteScreenX=Math.floor(W/2*(1+transformX/transformY)),spriteHeight=Math.abs(Math.floor(H/transformY)),spriteWidth=Math.floor(spriteHeight*.5),startY=Math.floor(H/2-spriteHeight/2),startX=Math.floor(spriteScreenX-spriteWidth/2),endX=startX+spriteWidth;
