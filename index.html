@@ -3,18 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Wolf-Style Survival</title>
+<title>NULLRELAY // HELLO WORLD 091</title>
 <style>
 *{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 html,body{position:fixed;inset:0;width:100%;height:100%;margin:0;overflow:hidden;overscroll-behavior:none;touch-action:none;background:#080b12;font-family:monospace}
 #game{position:fixed;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated;touch-action:none}
-#hud{position:fixed;top:max(12px,env(safe-area-inset-top));left:12px;color:#f3d28a;font-size:clamp(13px,2vw,19px);font-weight:bold;text-shadow:2px 2px #000;pointer-events:none;line-height:1.5}
+#hud{position:fixed;top:max(12px,env(safe-area-inset-top));left:12px;color:#59d9d6;font-size:clamp(13px,2vw,19px);font-weight:bold;text-shadow:2px 2px #000;pointer-events:none;line-height:1.5}
 #controls{position:fixed;bottom:max(20px,env(safe-area-inset-bottom));left:clamp(12px,5vw,70px);display:grid;grid-template-columns:repeat(3,clamp(50px,9vw,72px));grid-template-rows:repeat(2,clamp(50px,9vw,72px));gap:7px;touch-action:none}
 button{border:2px solid #a3a3a3;border-radius:12px;background:#1e293bdc;color:white;font-size:clamp(23px,4vw,30px);font-weight:bold;touch-action:none;-webkit-tap-highlight-color:transparent}
 button.pressed{background:#64748b}
 #turnLeft{grid-column:1;grid-row:1}#forward{grid-column:2;grid-row:1}#turnRight{grid-column:3;grid-row:1}
 #left{grid-column:1;grid-row:2}#back{grid-column:2;grid-row:2}#right{grid-column:3;grid-row:2}
-#fire{position:fixed;right:clamp(18px,8vw,110px);bottom:max(42px,env(safe-area-inset-bottom));width:clamp(82px,16vw,130px);height:clamp(82px,16vw,130px);border-radius:50%;background:#8e2929dd;border:3px solid #f1b0a4;font-size:clamp(18px,3vw,26px)}
+#fire{position:fixed;right:clamp(18px,8vw,110px);bottom:max(42px,env(safe-area-inset-bottom));width:clamp(82px,16vw,130px);height:clamp(82px,16vw,130px);border-radius:50%;background:#6d244fdd;border:3px solid #d65da7;font-size:clamp(18px,3vw,26px)}
 #fire.pressed{background:#e04a35}
 #gameover{position:fixed;inset:0;background:#080912e8;display:none;align-items:center;justify-content:center;flex-direction:column;color:white;text-align:center;z-index:5;gap:14px}
 #gameover h1{font-size:clamp(38px,8vw,72px);color:#ed4545;margin:0;text-shadow:3px 3px black}
@@ -24,7 +24,7 @@ button.pressed{background:#64748b}
 </head>
 <body>
 <canvas id="game"></canvas>
-<div id="hud"><div id="stats">HEALTH 100 | KILLS 0</div><div id="wave">ENEMY INCOMING</div></div>
+<div id="hud"><div id="stats">NULLRELAY_091 | HEALTH 100 | KILLS 0</div><div id="wave">SIGNAL: SEARCHING</div></div>
 <div id="controls">
 <button id="turnLeft">↶</button><button id="forward">▲</button><button id="turnRight">↷</button>
 <button id="left">◀</button><button id="back">▼</button><button id="right">▶</button>
@@ -44,19 +44,28 @@ const map=[
 const MW=map[0].length,MH=map.length;
 function wall(x,y){if(x<0||y<0||x>=MW||y>=MH)return 1;return Number(map[y][x]);}
 function solid(x,y,r=.2){return !!(wall(Math.floor(x-r),Math.floor(y-r))||wall(Math.floor(x+r),Math.floor(y-r))||wall(Math.floor(x-r),Math.floor(y+r))||wall(Math.floor(x+r),Math.floor(y+r)));}
-function makeTexture(type){const c=document.createElement('canvas');c.width=c.height=64;const t=c.getContext('2d');const base=['','#777b80','#405d88','#80614c'][type],mortar=['','#33383e','#202e49','#453529'][type];t.fillStyle=mortar;t.fillRect(0,0,64,64);
-for(let row=0;row<4;row++){const offset=row%2*16;for(let col=-1;col<3;col++){const x=col*32+offset,y=row*16;t.fillStyle=base;t.fillRect(x+1,y+1,30,14);t.fillStyle='#ffffff20';t.fillRect(x+2,y+2,28,2);t.fillStyle='#00000033';t.fillRect(x+2,y+12,28,2);}}
-let seed=type*12345;const rand=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);for(let i=0;i<900;i++){t.fillStyle=rand()>.5?'#ffffff12':'#0000001a';t.fillRect(rand()*64,rand()*64,2,2);}return t.getImageData(0,0,64,64).data;}
+function makeTexture(type){const c=document.createElement('canvas');c.width=c.height=64;const t=c.getContext('2d');t.imageSmoothingEnabled=false;
+const palettes={1:['#171f2c','#303b4c','#566173','#0a111b','#25a5a9'],2:['#101f2d','#263e50','#46687a','#07131d','#43d5e2'],3:['#291d2b','#554052','#815563','#170f20','#d34ba9']};
+const [dark,base,edge,black,glow]=palettes[type];t.fillStyle=dark;t.fillRect(0,0,64,64);
+const r=(x,y,w,h,color)=>{t.fillStyle=color;t.fillRect(x,y,w,h)};
+for(let row=0;row<2;row++)for(let col=0;col<2;col++){let x=col*32,y=row*32;r(x+1,y+1,30,30,black);r(x+3,y+3,26,26,base);r(x+3,y+3,26,2,edge);r(x+3,y+27,26,2,dark);r(x+5,y+5,2,2,edge);r(x+25,y+25,2,2,edge);
+if((row+col+type)%2===0){r(x+9,y+8,14,3,black);r(x+10,y+9,12,1,glow);r(x+9,y+14,14,9,dark);for(let k=0;k<4;k++)r(x+11+k*3,y+16,2,4,edge);}
+else{r(x+9,y+8,14,15,dark);r(x+11,y+10,10,11,black);r(x+12,y+12,8,2,glow);r(x+12,y+17,5,1,edge);}}
+if(type===3){r(42,5,8,54,'#492336');r(44,5,3,54,'#a05c70');r(38,30,18,5,'#733d51');r(40,42,16,4,'#bd6377');}
+let seed=type*91237;const rand=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);for(let i=0;i<240;i++){r(Math.floor(rand()*64),Math.floor(rand()*64),1,1,rand()>.5?'#ffffff18':'#00000030');}
+return t.getImageData(0,0,64,64).data;}
 const textures=[null,makeTexture(1),makeTexture(2),makeTexture(3)];
-// Original pixel-art guard, drawn once and used as a sprite.
+// Reclaimed: corrupted station personnel fused with security hardware.
 function makeGuard(){const c=document.createElement('canvas');c.width=32;c.height=64;const g=c.getContext('2d');g.imageSmoothingEnabled=false;
-function rect(color,x,y,w,h){g.fillStyle=color;g.fillRect(x,y,w,h);}
-rect('#151a1c',7,51,8,13);rect('#151a1c',18,51,8,13);rect('#292e35',7,50,8,9);rect('#292e35',18,50,8,9);
-rect('#1b2924',5,23,23,30);rect('#3e5644',7,25,19,24);rect('#26372d',5,27,5,21);rect('#26372d',24,27,5,21);
-rect('#ae8972',10,13,13,14);rect('#654b3c',10,13,13,3);rect('#232b2b',9,8,15,8);rect('#46544b',7,7,19,7);rect('#232b2b',7,13,19,3);
-rect('#1b2021',12,19,3,2);rect('#1b2021',20,19,3,2);rect('#594437',15,24,5,2);
-rect('#12191b',11,36,12,5);rect('#666b6a',13,32,8,10);rect('#1d2526',14,39,6,12);
-rect('#b6a36c',12,29,3,3);rect('#293d32',8,46,18,4);
+const r=(color,x,y,w,h)=>{g.fillStyle=color;g.fillRect(x,y,w,h)};
+r('#12151d',8,49,7,15);r('#14151a',19,48,8,16);r('#6b4d4c',9,48,6,9);r('#374452',20,49,7,10);
+r('#2c323c',6,25,23,27);r('#724d52',9,27,14,24);r('#a97773',11,28,9,19);r('#26323b',21,26,8,26);
+r('#151e28',5,22,11,11);r('#6c7882',5,23,9,6);r('#9d6868',17,24,10,7);
+r('#af7c74',2,30,5,18);r('#6c4c51',3,45,4,9);r('#28333d',26,30,5,17);r('#667786',27,35,4,10);
+r('#b78b7f',10,9,14,17);r('#74585a',10,9,14,5);r('#343a45',8,7,18,8);r('#77838a',9,7,16,4);
+r('#33202a',11,15,12,7);r('#e148b4',18,16,5,4);r('#ffd2ec',20,17,2,2);r('#2b1b27',12,18,3,3);
+r('#714249',13,24,8,4);r('#d09b8a',12,29,4,8);r('#412b39',17,32,3,12);
+r('#161d26',8,35,3,11);r('#d74d86',9,36,2,5);r('#566773',23,38,3,10);
 return g.getImageData(0,0,32,64).data;}
 const guardPixels=makeGuard(),zBuffer=new Float32Array(W);
 const player={x:3.5,y:5.5,angle:0,health:100};
@@ -94,7 +103,7 @@ if(!enemy&&spawnAt&&now>=spawnAt)spawnEnemy();
 if(enemy){const ex=player.x-enemy.x,ey=player.y-enemy.y,d=Math.hypot(ex,ey);if(d>0.8){const speed=1.05*dt;if(!solid(enemy.x+ex/d*speed,enemy.y,.23))enemy.x+=ex/d*speed;if(!solid(enemy.x,enemy.y+ey/d*speed,.23))enemy.y+=ey/d*speed;}
 if(d<1.25&&visible(enemy.x,enemy.y,player.x,player.y)&&now-lastEnemyAttack>900){lastEnemyAttack=now;player.health=Math.max(0,player.health-10);damageFlashUntil=now+180;if(player.health<=0)die();}}
 }
-function render(now){ctx.fillStyle='#444952';ctx.fillRect(0,0,W,H/2);ctx.fillStyle='#343b48';ctx.fillRect(0,H/2,W,H/2);const image=ctx.getImageData(0,0,W,H),pixels=image.data;
+function render(now){ctx.fillStyle='#131c2a';ctx.fillRect(0,0,W,H/2);ctx.fillStyle='#202b35';ctx.fillRect(0,H/2,W,H/2);for(let y=0;y<H/2;y+=12){ctx.fillStyle=y%24===0?'#26394a':'#1b2938';ctx.fillRect(0,y,W,1);}for(let y=H/2;y<H;y+=9){ctx.fillStyle=y%18===0?'#344554':'#15212b';ctx.fillRect(0,y,W,1);}const image=ctx.getImageData(0,0,W,H),pixels=image.data;
 const dirX=Math.cos(player.angle),dirY=Math.sin(player.angle),planeX=-dirY*.66,planeY=dirX*.66;
 for(let x=0;x<W;x++){const cameraX=2*x/W-1,rayX=dirX+planeX*cameraX,rayY=dirY+planeY*cameraX;const hit=rayDistance(player.x,player.y,rayX,rayY);if(!hit.hit){zBuffer[x]=30;continue;}const distance=hit.distance;zBuffer[x]=distance;const lineHeight=Math.floor(H/distance),start=Math.max(0,Math.floor((H-lineHeight)/2)),end=Math.min(H,Math.floor((H+lineHeight)/2));let texX=Math.floor(hit.wallX*64);if((hit.side===0&&rayX>0)||(hit.side===1&&rayY<0))texX=63-texX;const texture=textures[hit.hit]||textures[1],shade=Math.max(.25,Math.min(1,1.15-distance*.075))*(hit.side===1?.75:1);
 for(let y=start;y<end;y++){const texY=Math.floor(((y-H/2+lineHeight/2)/lineHeight)*64)&63,src=(texY*64+texX)*4,dst=(y*W+x)*4;pixels[dst]=texture[src]*shade;pixels[dst+1]=texture[src+1]*shade;pixels[dst+2]=texture[src+2]*shade;pixels[dst+3]=255;}}
@@ -108,11 +117,11 @@ ctx.fillStyle='#18191d';ctx.fillRect(143,171,34,29);ctx.fillStyle='#555961';ctx.
 if(now<flashUntil){ctx.fillStyle='#fff1a1';ctx.fillRect(154,123,12,22);ctx.fillRect(146,130,28,8);ctx.fillStyle='#ffad22';ctx.fillRect(157,128,6,15);}
 ctx.strokeStyle='#e6dfbb';ctx.beginPath();ctx.moveTo(155,100);ctx.lineTo(159,100);ctx.moveTo(161,100);ctx.lineTo(165,100);ctx.moveTo(160,95);ctx.lineTo(160,98);ctx.moveTo(160,102);ctx.lineTo(160,105);ctx.stroke();
 // Minimap.
-const scale=5,ox=5,oy=5;ctx.fillStyle='#000a';ctx.fillRect(ox-2,oy-2,MW*scale+4,MH*scale+4);for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){ctx.fillStyle=wall(x,y)?'#a5a9b1':'#26354b';ctx.fillRect(ox+x*scale,oy+y*scale,scale-1,scale-1);}if(enemy){ctx.fillStyle='#f44';ctx.fillRect(ox+enemy.x*scale-2,oy+enemy.y*scale-2,4,4);}ctx.fillStyle='#ffdc55';ctx.fillRect(ox+player.x*scale-2,oy+player.y*scale-2,4,4);ctx.strokeStyle='#ffdc55';ctx.beginPath();ctx.moveTo(ox+player.x*scale,oy+player.y*scale);ctx.lineTo(ox+(player.x+Math.cos(player.angle)*2)*scale,oy+(player.y+Math.sin(player.angle)*2)*scale);ctx.stroke();
+const scale=5,ox=5,oy=5;ctx.fillStyle='#000a';ctx.fillRect(ox-2,oy-2,MW*scale+4,MH*scale+4);for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){ctx.fillStyle=wall(x,y)?'#a5a9b1':'#26354b';ctx.fillRect(ox+x*scale,oy+y*scale,scale-1,scale-1);}if(enemy){ctx.fillStyle='#e148b4';ctx.fillRect(ox+enemy.x*scale-2,oy+enemy.y*scale-2,4,4);}ctx.fillStyle='#45d5df';ctx.fillRect(ox+player.x*scale-2,oy+player.y*scale-2,4,4);ctx.strokeStyle='#45d5df';ctx.beginPath();ctx.moveTo(ox+player.x*scale,oy+player.y*scale);ctx.lineTo(ox+(player.x+Math.cos(player.angle)*2)*scale,oy+(player.y+Math.sin(player.angle)*2)*scale);ctx.stroke();
 if(now<damageFlashUntil){ctx.fillStyle='#ff00004d';ctx.fillRect(0,0,W,H);}
 screen.imageSmoothingEnabled=false;screen.drawImage(buffer,0,0,canvas.width,canvas.height);
-document.getElementById('stats').textContent='HEALTH '+player.health+' | KILLS '+kills;
-document.getElementById('wave').textContent=enemy?'ENEMY ACTIVE':spawnAt?'NEXT ENEMY IN '+Math.max(0,Math.ceil((spawnAt-now)/1000))+'s':'ENEMY INCOMING';
+document.getElementById('stats').textContent='NULLRELAY_091 | HEALTH '+player.health+' | KILLS '+kills;
+document.getElementById('wave').textContent=enemy?'RECLAIMED DETECTED':spawnAt?'NEXT SIGNAL IN '+Math.max(0,Math.ceil((spawnAt-now)/1000))+'s':'SIGNAL: SEARCHING';
 }
 let previous=performance.now();function loop(now){const dt=Math.min((now-previous)/1000,.05);previous=now;update(dt,now);render(now);requestAnimationFrame(loop);}reset();requestAnimationFrame(loop);
 </script>
