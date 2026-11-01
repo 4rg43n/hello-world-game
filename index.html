@@ -188,7 +188,23 @@ function sound(name){
   case 'kill':tone(250,38,.46,.22);noise(.35,.19,320);break;
   case 'step':noise(.07,.10,430);tone(100,60,.09,.07,'triangle');break;
   case 'hurt':tone(170,55,.27,.26,'square');noise(.16,.18,600);break;
-  case 'spawn':tone(55,175,.55,.13);tone(230,110,.45,.06,'square',.15);break;
+  case 'spawn':{
+   // A long metal scrape, punctuated by irregular clanks and a heavy final impact.
+   const t=audio.currentTime,src=audio.createBufferSource(),filter=audio.createBiquadFilter(),gain=audio.createGain();
+   src.buffer=noiseBuffer;filter.type='bandpass';filter.Q.value=.85;
+   filter.frequency.setValueAtTime(310,t);
+   filter.frequency.linearRampToValueAtTime(760,t+.35);
+   filter.frequency.linearRampToValueAtTime(180,t+1.05);
+   gain.gain.setValueAtTime(.0001,t);
+   gain.gain.linearRampToValueAtTime(.075,t+.10);
+   gain.gain.setValueAtTime(.065,t+.28);
+   gain.gain.linearRampToValueAtTime(.11,t+.46);
+   gain.gain.linearRampToValueAtTime(.04,t+.83);
+   gain.gain.exponentialRampToValueAtTime(.0001,t+1.18);
+   src.connect(filter);filter.connect(gain);gain.connect(master);src.start(t);src.stop(t+1.2);
+   noise(.11,.11,480,.18);noise(.09,.13,900,.43);noise(.16,.20,330,.83);
+   tone(76,39,.34,.095,'sawtooth',.82);
+   break;}
   case 'breath':{if(!enemy)break;const dx=enemy.x-player.x,dy=enemy.y-player.y,d=Math.hypot(dx,dy);if(d>8)break;
 const proximity=Math.pow(Math.max(0,1-d/8),1.45),volume=(.004+.06*proximity)*1.1;
 const relative=Math.atan2(dy,dx)-player.angle,pan=Math.max(-.85,Math.min(.85,Math.sin(relative)));
