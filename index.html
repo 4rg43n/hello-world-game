@@ -237,20 +237,21 @@ for(let i=0;i<64;i++){if(sx<sy){sx+=deltaX;mx+=stepX;side=0;}else{sy+=deltaY;my+
 return {distance:maxDistance,hit:0};}
 function visible(ax,ay,bx,by){const dx=bx-ax,dy=by-ay,d=Math.hypot(dx,dy);return rayDistance(ax,ay,dx/d,dy/d,d).distance>=d-.15;}
 const corners=[[1.5,1.5],[14.5,1.5],[1.5,14.5],[14.5,14.5]];
-function spawnEnemy(){const choices=corners.filter(([x,y])=>!solid(x,y,.22)&&Math.hypot(x-player.x,y-player.y)>3);const pool=choices.length?choices:corners.filter(([x,y])=>!solid(x,y,.22));if(!pool.length)return;const [x,y]=pool[Math.floor(Math.random()*pool.length)];enemy={x,y,health:2,hitUntil:0,step:0};spawnAt=0;sound('spawn');}
+function spawnEnemy(){const choices=corners.filter(([x,y])=>!solid(x,y,.22)&&Math.hypot(x-player.x,y-player.y)>3);const pool=choices.length?choices:corners.filter(([x,y])=>!solid(x,y,.22));if(!pool.length)return;const [x,y]=pool[Math.floor(Math.random()*pool.length)];enemy={x,y,health:2,hitUntil:0,deathAt:0,step:0};spawnAt=0;sound('spawn');}
 function reset(){player.x=3.5;player.y=5.5;player.angle=0;player.health=100;kills=0;enemy=null;gameOver=false;spawnAt=0;flashUntil=0;damageFlashUntil=0;lastShot=0;lastEnemyAttack=0;lastStepSound=0;lastBreathSound=0;lastStaticSound=0;lastBackTap=-1000;walkPhase=0;walkBlend=0;shotKick=0;impactUntil=0;shakeUntil=0;activePointers.clear();keyboardHeld.clear();syncKeys();document.getElementById('gameover').style.display='none';spawnEnemy();}
 document.getElementById('restart').addEventListener('click',reset);
 function die(){gameOver=true;player.health=0;document.getElementById('finalScore').textContent='Enemies killed: '+kills;document.getElementById('gameover').style.display='flex';}
-function shoot(now){if(gameOver||now-lastShot<300)return;lastShot=now;flashUntil=now+110;sound('shot');shotKick=1;shakeUntil=now+95;if(!enemy)return;const dx=enemy.x-player.x,dy=enemy.y-player.y,dist=Math.hypot(dx,dy),angle=Math.atan2(dy,dx)-player.angle,aim=Math.atan2(Math.sin(angle),Math.cos(angle));if(Math.abs(aim)<Math.atan2(.32,dist)&&visible(player.x,player.y,enemy.x,enemy.y)){enemy.health--;sound('hit');enemy.hitUntil=now+190;impactUntil=now+125;if(enemy.health<=0){enemy=null;kills++;sound('kill');spawnAt=now+5000;}}}
+function shoot(now){if(gameOver||now-lastShot<300)return;lastShot=now;flashUntil=now+110;sound('shot');shotKick=1;shakeUntil=now+95;if(!enemy||enemy.deathAt)return;const dx=enemy.x-player.x,dy=enemy.y-player.y,dist=Math.hypot(dx,dy),angle=Math.atan2(dy,dx)-player.angle,aim=Math.atan2(Math.sin(angle),Math.cos(angle));if(Math.abs(aim)<Math.atan2(.32,dist)&&visible(player.x,player.y,enemy.x,enemy.y)){enemy.health--;sound('hit');enemy.hitUntil=now+190;impactUntil=now+125;if(enemy.health<=0){enemy.health=0;enemy.deathAt=now+260;kills++;sound('kill');}}}
 function update(dt,now){if(gameOver)return;
 if(keys.has('turnLeft'))player.angle-=2.3*dt;if(keys.has('turnRight'))player.angle+=2.3*dt;
 const dx=Math.cos(player.angle),dy=Math.sin(player.angle),sx=-dy,sy=dx;let mx=0,my=0;
 if(keys.has('forward')){mx+=dx;my+=dy;}if(keys.has('back')){mx-=dx;my-=dy;}if(keys.has('left')){mx-=sx;my-=sy;}if(keys.has('right')){mx+=sx;my+=sy;}
 const len=Math.hypot(mx,my);let moved=0;if(len){const oldX=player.x,oldY=player.y,vx=mx/len*2.8*dt,vy=my/len*2.8*dt;if(!solid(player.x+vx,player.y))player.x+=vx;if(!solid(player.x,player.y+vy))player.y+=vy;moved=Math.hypot(player.x-oldX,player.y-oldY);}walkBlend+=(Number(moved>0)-walkBlend)*Math.min(1,dt*12);if(moved>0){walkPhase+=moved*10;if(now-lastStepSound>350){lastStepSound=now;sound('step');}}shotKick=Math.max(0,shotKick-dt*6);
 if(keys.has('fire'))shoot(now);
+if(enemy&&enemy.deathAt&&now>=enemy.deathAt){enemy=null;spawnAt=now+5000;}
 if(!enemy&&spawnAt&&now>=spawnAt)spawnEnemy();
 if(now-lastStaticSound>6500){lastStaticSound=now;sound('static');}
-if(enemy){const ex=player.x-enemy.x,ey=player.y-enemy.y,d=Math.hypot(ex,ey);
+if(enemy&&!enemy.deathAt){const ex=player.x-enemy.x,ey=player.y-enemy.y,d=Math.hypot(ex,ey);
 if(d<8&&now-lastBreathSound>Math.max(1500,3000-d*135)){lastBreathSound=now;sound('breath');}if(d>0.8){enemy.step+=dt*5;const speed=1.05*dt;if(!solid(enemy.x+ex/d*speed,enemy.y,.23))enemy.x+=ex/d*speed;if(!solid(enemy.x,enemy.y+ey/d*speed,.23))enemy.y+=ey/d*speed;}
 if(d<1.25&&visible(enemy.x,enemy.y,player.x,player.y)&&now-lastEnemyAttack>900){lastEnemyAttack=now;sound('hurt');player.health=Math.max(0,player.health-10);damageFlashUntil=now+180;if(player.health<=0)die();}}
 }
@@ -262,7 +263,7 @@ for(let y=start;y<end;y++){const texY=Math.floor(((y-H/2+lineHeight/2)/lineHeigh
 // Enemy billboard with wall-depth occlusion.
 if(enemy){const spriteX=enemy.x-player.x,spriteY=enemy.y-player.y,invDet=1/(planeX*dirY-dirX*planeY),transformX=invDet*(dirY*spriteX-dirX*spriteY),transformY=invDet*(-planeY*spriteX+planeX*spriteY);
 if(transformY>.1){const spriteScreenX=Math.floor(W/2*(1+transformX/transformY)),spriteHeight=Math.abs(Math.floor(H/transformY)),spriteWidth=Math.floor(spriteHeight*.5),startY=Math.floor(H/2-spriteHeight/2),startX=Math.floor(spriteScreenX-spriteWidth/2),endX=startX+spriteWidth;
-for(let stripe=Math.max(0,startX);stripe<Math.min(W,endX);stripe++){if(transformY>=zBuffer[stripe]||spriteWidth<=0)continue;const tx=Math.floor((stripe-startX)/spriteWidth*32);for(let y=Math.max(0,startY);y<Math.min(H,startY+spriteHeight);y++){const ty=Math.floor((y-startY)/spriteHeight*64);if(tx<0||tx>=32||ty<0||ty>=64)continue;const sprite=reclaimedFrames[Math.floor(enemy.step)%2],src=(ty*32+tx)*4;if(!sprite[src+3])continue;const dst=(y*W+stripe)*4,shade=Math.max(.4,1-transformY*.035);const hitFlash=now<enemy.hitUntil;pixels[dst]=hitFlash?245:sprite[src]*shade;pixels[dst+1]=hitFlash?120:sprite[src+1]*shade;pixels[dst+2]=hitFlash?177:sprite[src+2]*shade;pixels[dst+3]=255;}}}}
+for(let stripe=Math.max(0,startX);stripe<Math.min(W,endX);stripe++){if(transformY>=zBuffer[stripe]||spriteWidth<=0)continue;const tx=Math.floor((stripe-startX)/spriteWidth*32);for(let y=Math.max(0,startY);y<Math.min(H,startY+spriteHeight);y++){const ty=Math.floor((y-startY)/spriteHeight*64);if(tx<0||tx>=32||ty<0||ty>=64)continue;const sprite=reclaimedFrames[Math.floor(enemy.step)%2],src=(ty*32+tx)*4;if(!sprite[src+3])continue;const dst=(y*W+stripe)*4,shade=Math.max(.4,1-transformY*.035);const hitFlash=now<enemy.hitUntil||!!enemy.deathAt;pixels[dst]=hitFlash?245:sprite[src]*shade;pixels[dst+1]=hitFlash?120:sprite[src+1]*shade;pixels[dst+2]=hitFlash?177:sprite[src+2]*shade;pixels[dst+3]=255;}}}}
 ctx.putImageData(image,0,0);
 // Weapon and muzzle flash.
 const bobX=Math.round(Math.sin(walkPhase)*2*walkBlend),bobY=Math.round(Math.abs(Math.cos(walkPhase))*3*walkBlend),recoil=Math.round(shotKick*9);ctx.save();ctx.translate(bobX,bobY+recoil);
@@ -275,7 +276,7 @@ const scale=5,ox=W-MW*scale-6,oy=6;ctx.fillStyle='#000a';ctx.fillRect(ox-2,oy-2,
 if(now<damageFlashUntil){ctx.fillStyle='#ff00004d';ctx.fillRect(0,0,W,H);}
 screen.imageSmoothingEnabled=false;const shake=now<shakeUntil?Math.round(Math.sin(now*.25)*2):0;screen.drawImage(buffer,shake,0,canvas.width,canvas.height);
 document.getElementById('stats').textContent='NULLRELAY_091 | HEALTH '+player.health+' | KILLS '+kills;
-document.getElementById('wave').textContent=enemy?'RECLAIMED DETECTED':spawnAt?'NEXT SIGNAL IN '+Math.max(0,Math.ceil((spawnAt-now)/1000))+'s':'SIGNAL: SEARCHING';
+document.getElementById('wave').textContent=enemy?(enemy.deathAt?'ASSET_091-R TERMINATED':'RECLAIMED DETECTED'):spawnAt?'NEXT SIGNAL IN '+Math.max(0,Math.ceil((spawnAt-now)/1000))+'s':'SIGNAL: SEARCHING';
 }
 let previous=performance.now();function loop(now){const dt=Math.min((now-previous)/1000,.05);previous=now;update(dt,now);render(now);requestAnimationFrame(loop);}reset();requestAnimationFrame(loop);
 </script>
