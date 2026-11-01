@@ -189,7 +189,15 @@ function sound(name){
   case 'step':noise(.07,.10,430);tone(100,60,.09,.07,'triangle');break;
   case 'hurt':tone(170,55,.27,.26,'square');noise(.16,.18,600);break;
   case 'spawn':tone(55,175,.55,.13);tone(230,110,.45,.06,'square',.15);break;
-  case 'breath':{const t=audio.currentTime,src=audio.createBufferSource(),band=audio.createBiquadFilter(),gain=audio.createGain();src.buffer=noiseBuffer;band.type='bandpass';band.frequency.setValueAtTime(210,t);band.frequency.exponentialRampToValueAtTime(115,t+1.15);band.Q.value=.75;gain.gain.setValueAtTime(.0001,t);gain.gain.linearRampToValueAtTime(.022,t+.32);gain.gain.linearRampToValueAtTime(.015,t+.78);gain.gain.exponentialRampToValueAtTime(.0001,t+1.35);src.connect(band);band.connect(gain);gain.connect(master);src.start(t);src.stop(t+1.36);break;}
+  case 'breath':{if(!enemy)break;const dx=enemy.x-player.x,dy=enemy.y-player.y,d=Math.hypot(dx,dy);if(d>8)break;
+const proximity=Math.pow(Math.max(0,1-d/8),1.45),volume=.004+.06*proximity;
+const relative=Math.atan2(dy,dx)-player.angle,pan=Math.max(-.85,Math.min(.85,Math.sin(relative)));
+const t=audio.currentTime,src=audio.createBufferSource(),band=audio.createBiquadFilter(),gain=audio.createGain();
+src.buffer=noiseBuffer;band.type='bandpass';band.frequency.setValueAtTime(210,t);band.frequency.exponentialRampToValueAtTime(115,t+1.15);band.Q.value=.75;
+gain.gain.setValueAtTime(.0001,t);gain.gain.linearRampToValueAtTime(volume,t+.32);gain.gain.linearRampToValueAtTime(volume*.68,t+.78);gain.gain.exponentialRampToValueAtTime(.0001,t+1.35);
+src.connect(band);band.connect(gain);
+if(audio.createStereoPanner){const panner=audio.createStereoPanner();panner.pan.value=pan;gain.connect(panner);panner.connect(master);}else gain.connect(master);
+src.start(t);src.stop(t+1.36);break;}
   case 'static':noise(.12,.035,2100);tone(860,300,.10,.018,'square');break;
  }
 }
@@ -241,7 +249,7 @@ if(keys.has('fire'))shoot(now);
 if(!enemy&&spawnAt&&now>=spawnAt)spawnEnemy();
 if(now-lastStaticSound>6500){lastStaticSound=now;sound('static');}
 if(enemy){const ex=player.x-enemy.x,ey=player.y-enemy.y,d=Math.hypot(ex,ey);
-if(d<5&&now-lastBreathSound>2700){lastBreathSound=now;sound('breath');}if(d>0.8){enemy.step+=dt*5;const speed=1.05*dt;if(!solid(enemy.x+ex/d*speed,enemy.y,.23))enemy.x+=ex/d*speed;if(!solid(enemy.x,enemy.y+ey/d*speed,.23))enemy.y+=ey/d*speed;}
+if(d<8&&now-lastBreathSound>Math.max(1500,3000-d*135)){lastBreathSound=now;sound('breath');}if(d>0.8){enemy.step+=dt*5;const speed=1.05*dt;if(!solid(enemy.x+ex/d*speed,enemy.y,.23))enemy.x+=ex/d*speed;if(!solid(enemy.x,enemy.y+ey/d*speed,.23))enemy.y+=ey/d*speed;}
 if(d<1.25&&visible(enemy.x,enemy.y,player.x,player.y)&&now-lastEnemyAttack>900){lastEnemyAttack=now;sound('hurt');player.health=Math.max(0,player.health-10);damageFlashUntil=now+180;if(player.health<=0)die();}}
 }
 function render(now){const image=ctx.createImageData(W,H),pixels=image.data;
