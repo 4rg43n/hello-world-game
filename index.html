@@ -33,11 +33,12 @@ button.pressed{background:#366878;color:#d7ffff;box-shadow:inset 3px 3px #08141b
 #gameover{background:#070e19f2;color:#9ce3e4;font-family:monospace}
 #gameover h1{color:#e06aa7;letter-spacing:4px}
 #restart{border-color:#6db7bb;background:#163844;color:#a3f0ed;border-radius:0;letter-spacing:2px}
+#soundToggle{pointer-events:auto;margin-top:5px;padding:3px 7px;border:1px solid #517482;background:#101e29;color:#83dfe1;font-size:11px;letter-spacing:1px;box-shadow:none}
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
-<div id="hud"><div id="stats">NULLRELAY_091 | HEALTH 100 | KILLS 0</div><div id="wave">SIGNAL: SEARCHING</div></div>
+<div id="hud"><div id="stats">NULLRELAY_091 | HEALTH 100 | KILLS 0</div><div id="wave">SIGNAL: SEARCHING</div><button id="soundToggle" type="button" aria-label="Toggle game sound" aria-pressed="true">SND ON</button></div>
 <div id="controls">
 <button id="turnLeft">↶</button><button id="forward">▲</button><button id="turnRight">↷</button>
 <button id="left">◀</button><button id="back">▼</button><button id="right">▶</button>
@@ -110,7 +111,68 @@ let walkPhase=0,walkBlend=0,shotKick=0,impactUntil=0,shakeUntil=0,lightPulse=1;
 const guardPixels=makeGuard(),zBuffer=new Float32Array(W);
 const player={x:3.5,y:5.5,angle:0,health:100};
 let enemy=null,kills=0,spawnAt=0,gameOver=false,flashUntil=0,damageFlashUntil=0,lastShot=0,lastEnemyAttack=0;
+
+/* Self-contained Web Audio soundscape. Initialized only after a user gesture. */
+const AudioClass=window.AudioContext||window.webkitAudioContext;
+let audio=null,master=null,noiseBuffer=null,humOsc=null,humGain=null,lastStepSound=0,lastBreathSound=0,lastStaticSound=0;
+let soundEnabled=true;
+function initializeAudio(){
+ if(!soundEnabled||!AudioClass)return;
+ try{
+  if(!audio){
+   audio=new AudioClass();master=audio.createGain();master.gain.value=.24;master.connect(audio.destination);
+   noiseBuffer=audio.createBuffer(1,audio.sampleRate,audio.sampleRate);
+   const data=noiseBuffer.getChannelData(0);let seed=73191;
+   for(let i=0;i<data.length;i++){seed=(Math.imul(seed,1664525)+1013904223)>>>0;data[i]=(seed/2147483648-1);}
+   humOsc=audio.createOscillator();humOsc.type='sawtooth';humOsc.frequency.value=49;
+   const filter=audio.createBiquadFilter();filter.type='lowpass';filter.frequency.value=115;
+   humGain=audio.createGain();humGain.gain.value=.045;
+   humOsc.connect(filter);filter.connect(humGain);humGain.connect(master);humOsc.start();
+  }
+  if(audio.state==='suspended')audio.resume().catch(()=>{});
+ }catch(e){console.warn('Audio unavailable:',e);soundEnabled=false;}
+}
+function tone(freq,endFreq,duration,volume,type='sawtooth',delay=0){
+ if(!audio||audio.state!=='running'||!soundEnabled)return;
+ const t=audio.currentTime+delay,osc=audio.createOscillator(),gain=audio.createGain();
+ osc.type=type;osc.frequency.setValueAtTime(Math.max(1,freq),t);
+ osc.frequency.exponentialRampToValueAtTime(Math.max(1,endFreq),t+duration);
+ gain.gain.setValueAtTime(Math.max(.0001,volume),t);
+ gain.gain.exponentialRampToValueAtTime(.0001,t+duration);
+ osc.connect(gain);gain.connect(master);osc.start(t);osc.stop(t+duration+.01);
+}
+function noise(duration,volume,cutoff=1000,delay=0){
+ if(!audio||audio.state!=='running'||!soundEnabled)return;
+ const t=audio.currentTime+delay,source=audio.createBufferSource(),filter=audio.createBiquadFilter(),gain=audio.createGain();
+ source.buffer=noiseBuffer;filter.type='lowpass';filter.frequency.value=cutoff;
+ gain.gain.setValueAtTime(Math.max(.0001,volume),t);
+ gain.gain.exponentialRampToValueAtTime(.0001,t+duration);
+ source.connect(filter);filter.connect(gain);gain.connect(master);source.start(t);source.stop(t+duration+.01);
+}
+function sound(name){
+ if(!audio||audio.state!=='running'||!soundEnabled)return;
+ switch(name){
+  case 'shot':noise(.19,.5,1300);tone(145,45,.22,.32);tone(720,110,.07,.12,'square');break;
+  case 'hit':noise(.13,.2,550);tone(185,65,.18,.18);break;
+  case 'kill':tone(250,38,.46,.22);noise(.35,.19,320);break;
+  case 'step':noise(.07,.10,430);tone(100,60,.09,.07,'triangle');break;
+  case 'hurt':tone(170,55,.27,.26,'square');noise(.16,.18,600);break;
+  case 'spawn':tone(55,175,.55,.13);tone(230,110,.45,.06,'square',.15);break;
+  case 'breath':noise(.65,.07,260);tone(72,48,.65,.035);break;
+  case 'static':noise(.12,.035,2100);tone(860,300,.10,.018,'square');break;
+ }
+}
+function setSoundEnabled(value){
+ soundEnabled=value;document.getElementById('soundToggle').textContent=value?'SND ON':'SND OFF';
+ document.getElementById('soundToggle').setAttribute('aria-pressed',String(value));
+ if(value){initializeAudio();if(master)master.gain.value=.24;}
+ else if(master)master.gain.value=0;
+}
+
 const keys=new Set(),activePointers=new Map(),keyboardHeld=new Set();
+document.getElementById('soundToggle').addEventListener('click',()=>setSoundEnabled(!soundEnabled));
+window.addEventListener('pointerdown',initializeAudio,{passive:true});
+window.addEventListener('keydown',initializeAudio);
 const bindings={forward:'forward',back:'back',left:'left',right:'right',turnLeft:'turnLeft',turnRight:'turnRight',fire:'fire'};
 function syncKeys(){keys.clear();for(const action of activePointers.values())keys.add(action);for(const action of keyboardHeld)keys.add(action);}
 for(const [id,action] of Object.entries(bindings)){const b=document.getElementById(id);b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);activePointers.set(e.pointerId,action);b.classList.add('pressed');syncKeys();});function release(e){activePointers.delete(e.pointerId);b.classList.remove('pressed');syncKeys();}b.addEventListener('pointerup',release);b.addEventListener('pointercancel',release);b.addEventListener('lostpointercapture',release);}
@@ -128,20 +190,22 @@ for(let i=0;i<64;i++){if(sx<sy){sx+=deltaX;mx+=stepX;side=0;}else{sy+=deltaY;my+
 return {distance:maxDistance,hit:0};}
 function visible(ax,ay,bx,by){const dx=bx-ax,dy=by-ay,d=Math.hypot(dx,dy);return rayDistance(ax,ay,dx/d,dy/d,d).distance>=d-.15;}
 const corners=[[1.5,1.5],[14.5,1.5],[1.5,14.5],[14.5,14.5]];
-function spawnEnemy(){const choices=corners.filter(([x,y])=>!solid(x,y,.22)&&Math.hypot(x-player.x,y-player.y)>3);const pool=choices.length?choices:corners.filter(([x,y])=>!solid(x,y,.22));if(!pool.length)return;const [x,y]=pool[Math.floor(Math.random()*pool.length)];enemy={x,y,health:2,hitUntil:0,step:0};spawnAt=0;}
-function reset(){player.x=3.5;player.y=5.5;player.angle=0;player.health=100;kills=0;enemy=null;gameOver=false;spawnAt=0;flashUntil=0;damageFlashUntil=0;lastShot=0;lastEnemyAttack=0;walkPhase=0;walkBlend=0;shotKick=0;impactUntil=0;shakeUntil=0;activePointers.clear();keyboardHeld.clear();syncKeys();document.getElementById('gameover').style.display='none';spawnEnemy();}
+function spawnEnemy(){const choices=corners.filter(([x,y])=>!solid(x,y,.22)&&Math.hypot(x-player.x,y-player.y)>3);const pool=choices.length?choices:corners.filter(([x,y])=>!solid(x,y,.22));if(!pool.length)return;const [x,y]=pool[Math.floor(Math.random()*pool.length)];enemy={x,y,health:2,hitUntil:0,step:0};spawnAt=0;sound('spawn');}
+function reset(){player.x=3.5;player.y=5.5;player.angle=0;player.health=100;kills=0;enemy=null;gameOver=false;spawnAt=0;flashUntil=0;damageFlashUntil=0;lastShot=0;lastEnemyAttack=0;lastStepSound=0;lastBreathSound=0;lastStaticSound=0;walkPhase=0;walkBlend=0;shotKick=0;impactUntil=0;shakeUntil=0;activePointers.clear();keyboardHeld.clear();syncKeys();document.getElementById('gameover').style.display='none';spawnEnemy();}
 document.getElementById('restart').addEventListener('click',reset);
 function die(){gameOver=true;player.health=0;document.getElementById('finalScore').textContent='Enemies killed: '+kills;document.getElementById('gameover').style.display='flex';}
-function shoot(now){if(gameOver||now-lastShot<300)return;lastShot=now;flashUntil=now+110;shotKick=1;shakeUntil=now+95;if(!enemy)return;const dx=enemy.x-player.x,dy=enemy.y-player.y,dist=Math.hypot(dx,dy),angle=Math.atan2(dy,dx)-player.angle,aim=Math.atan2(Math.sin(angle),Math.cos(angle));if(Math.abs(aim)<Math.atan2(.32,dist)&&visible(player.x,player.y,enemy.x,enemy.y)){enemy.health--;enemy.hitUntil=now+190;impactUntil=now+125;if(enemy.health<=0){enemy=null;kills++;spawnAt=now+5000;}}}
+function shoot(now){if(gameOver||now-lastShot<300)return;lastShot=now;flashUntil=now+110;sound('shot');shotKick=1;shakeUntil=now+95;if(!enemy)return;const dx=enemy.x-player.x,dy=enemy.y-player.y,dist=Math.hypot(dx,dy),angle=Math.atan2(dy,dx)-player.angle,aim=Math.atan2(Math.sin(angle),Math.cos(angle));if(Math.abs(aim)<Math.atan2(.32,dist)&&visible(player.x,player.y,enemy.x,enemy.y)){enemy.health--;sound('hit');enemy.hitUntil=now+190;impactUntil=now+125;if(enemy.health<=0){enemy=null;kills++;sound('kill');spawnAt=now+5000;}}}
 function update(dt,now){if(gameOver)return;
 if(keys.has('turnLeft'))player.angle-=2.3*dt;if(keys.has('turnRight'))player.angle+=2.3*dt;
 const dx=Math.cos(player.angle),dy=Math.sin(player.angle),sx=-dy,sy=dx;let mx=0,my=0;
 if(keys.has('forward')){mx+=dx;my+=dy;}if(keys.has('back')){mx-=dx;my-=dy;}if(keys.has('left')){mx-=sx;my-=sy;}if(keys.has('right')){mx+=sx;my+=sy;}
-const len=Math.hypot(mx,my);let moved=0;if(len){const oldX=player.x,oldY=player.y,vx=mx/len*2.8*dt,vy=my/len*2.8*dt;if(!solid(player.x+vx,player.y))player.x+=vx;if(!solid(player.x,player.y+vy))player.y+=vy;moved=Math.hypot(player.x-oldX,player.y-oldY);}walkBlend+=(Number(moved>0)-walkBlend)*Math.min(1,dt*12);if(moved>0)walkPhase+=moved*10;shotKick=Math.max(0,shotKick-dt*6);
+const len=Math.hypot(mx,my);let moved=0;if(len){const oldX=player.x,oldY=player.y,vx=mx/len*2.8*dt,vy=my/len*2.8*dt;if(!solid(player.x+vx,player.y))player.x+=vx;if(!solid(player.x,player.y+vy))player.y+=vy;moved=Math.hypot(player.x-oldX,player.y-oldY);}walkBlend+=(Number(moved>0)-walkBlend)*Math.min(1,dt*12);if(moved>0){walkPhase+=moved*10;if(now-lastStepSound>350){lastStepSound=now;sound('step');}}shotKick=Math.max(0,shotKick-dt*6);
 if(keys.has('fire'))shoot(now);
 if(!enemy&&spawnAt&&now>=spawnAt)spawnEnemy();
-if(enemy){const ex=player.x-enemy.x,ey=player.y-enemy.y,d=Math.hypot(ex,ey);if(d>0.8){enemy.step+=dt*5;const speed=1.05*dt;if(!solid(enemy.x+ex/d*speed,enemy.y,.23))enemy.x+=ex/d*speed;if(!solid(enemy.x,enemy.y+ey/d*speed,.23))enemy.y+=ey/d*speed;}
-if(d<1.25&&visible(enemy.x,enemy.y,player.x,player.y)&&now-lastEnemyAttack>900){lastEnemyAttack=now;player.health=Math.max(0,player.health-10);damageFlashUntil=now+180;if(player.health<=0)die();}}
+if(now-lastStaticSound>6500){lastStaticSound=now;sound('static');}
+if(enemy){const ex=player.x-enemy.x,ey=player.y-enemy.y,d=Math.hypot(ex,ey);
+if(d<5&&now-lastBreathSound>1900){lastBreathSound=now;sound('breath');}if(d>0.8){enemy.step+=dt*5;const speed=1.05*dt;if(!solid(enemy.x+ex/d*speed,enemy.y,.23))enemy.x+=ex/d*speed;if(!solid(enemy.x,enemy.y+ey/d*speed,.23))enemy.y+=ey/d*speed;}
+if(d<1.25&&visible(enemy.x,enemy.y,player.x,player.y)&&now-lastEnemyAttack>900){lastEnemyAttack=now;sound('hurt');player.health=Math.max(0,player.health-10);damageFlashUntil=now+180;if(player.health<=0)die();}}
 }
 function render(now){const image=ctx.createImageData(W,H),pixels=image.data;
 const dirX=Math.cos(player.angle),dirY=Math.sin(player.angle),planeX=-dirY*.66,planeY=dirX*.66;
