@@ -190,7 +190,7 @@ function sound(name){
   case 'hurt':tone(170,55,.27,.26,'square');noise(.16,.18,600);break;
   case 'spawn':tone(55,175,.55,.13);tone(230,110,.45,.06,'square',.15);break;
   case 'breath':{if(!enemy)break;const dx=enemy.x-player.x,dy=enemy.y-player.y,d=Math.hypot(dx,dy);if(d>8)break;
-const proximity=Math.pow(Math.max(0,1-d/8),1.45),volume=.004+.06*proximity;
+const proximity=Math.pow(Math.max(0,1-d/8),1.45),volume=(.004+.06*proximity)*1.1;
 const relative=Math.atan2(dy,dx)-player.angle,pan=Math.max(-.85,Math.min(.85,Math.sin(relative)));
 const t=audio.currentTime,src=audio.createBufferSource(),band=audio.createBiquadFilter(),gain=audio.createGain();
 src.buffer=noiseBuffer;band.type='bandpass';band.frequency.setValueAtTime(210,t);band.frequency.exponentialRampToValueAtTime(115,t+1.15);band.Q.value=.75;
